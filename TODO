@@ -10,8 +10,6 @@ missing bdos functions:
 
 something wrong when winstall is run (but it works with BDOS)
 
-something wrong when 'e' is given to ed.com (but it works with BDOS)
-
 provide simple key to exit simulator?
 
 mount directories as drives in bdos emulator:  ./cpm --A /foo --B /bar ...
@@ -24,6 +22,9 @@ improve putunix / getunix so that you can supply just a single file name
 include a cpm disk manager utility: find one (maybe yaze)
 
 - - -
+
+something wrong when 'e' is given to ed.com (but it works with BDOS)
+[fixed- only random access commands should write FCB bytes R0 - R2]
 
 adventure doesn't work- it's seeking by modifying FCB directly
 [fixed- now we keep file position in the FCB]

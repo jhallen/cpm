@@ -558,15 +558,16 @@ void check_BDOS_hook(z80info *z80) {
 
 	/* User has to set EX, S2, and CR: don't change these- some set them to non-zero */
 	z80->mem[DE + FCB_S1] = 0;
-	memset(z80->mem + DE + 16, 0, 16);
+	/* memset(z80->mem + DE + 16, 0, 16); */ /* Clear D0-Dn */
 
-	/* Should we clear R0 - R2? */
-	memset(z80->mem + DE + 33, 0, 3);
+	/* Should we clear R0 - R2? Nope: then we overlap the following area. */
+	/* memset(z80->mem + DE + 33, 0, 3); */
 
 	/* We need to set high bit of S2: means file is open? */
 	z80->mem[DE + FCB_S2] |= 0x80;
 
 	z80->mem[DE + FCB_RC] = 0;	/* rc field of FCB */
+
 	if (fixrc(z80, fp)) { /* Not a real file? */
 	    HL = 0xFF;
             B = H; A = L;
