@@ -12,7 +12,7 @@ LDFLAGS =
 
 FILES = README.md Makefile A-Hdrive B-Hdrive cpmws.png \
 	bdos.c bios.c cpm.c cpmdisc.h defs.h disassem.c main.c vt.c vt.h z80.c \
-	bye.mac getunix.mac putunix.mac
+	bye.mac getunix.mac putunix.mac cpmtool.c
 
 OBJS =	bios.o \
 	disassem.o \
@@ -20,6 +20,11 @@ OBJS =	bios.o \
 	vt.o \
 	bdos.o \
 	z80.o
+
+all: cpm cpmtool
+
+cpmtool: cpmtool.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o cpmtool cpmtool.o
 
 cpm: $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o cpm $(OBJS)
@@ -31,7 +36,7 @@ disassem.o:	disassem.c defs.h
 main.o:		main.c defs.h
 
 clean:
-	rm -f cpm *.o
+	rm -f cpm cpmtool *.o *~
 
 tags:	$(FILES)
 	cxxtags *.[hc]

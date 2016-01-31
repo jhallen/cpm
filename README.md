@@ -1,5 +1,5 @@
 
-# ANSI CP/M Emulator
+# ANSI CP/M Emulator and disk image tool
 
 This emulator allows you to execute CP/M commands on UNIX (Linux or Cygwin). 
 
@@ -19,10 +19,10 @@ disabled.  In this case, P2DOS (a BDOS clone) is used to access real disk
 images.
 
 This is a modified version of Parag Patel's [CP/M](https://en.wikipedia.org/wiki/CP/M) emulator.  This
-version includes a filter/emulator for [VT-52](https://en.wikipedia.org/wiki/VT52) and
-[ADM-3A](https://en.wikipedia.org/wiki/ADM-3A) terminals. 
-Basically it converts VT-52 codes into ANSI codes on output and converts
-arrow keys and PgUp / PgDn into WordStar motion keys on input.
+version includes a filter/emulator for an [ADM-3A](https://en.wikipedia.org/wiki/ADM-3A) terminal as
+emulated by a [Kaypro 2x](http://www.oldcomputers.net/kayproii.html).  Basically it converts ADM-3A codes
+into ANSI codes on output and converts arrow keys and PgUp / PgDn into
+WordStar motion keys on input.
 
 This allows screen oriented programs written for Kaypro-II such as WordStar,
 Turbo PASCAL and dBASE-II to operate directly with ANSI terminal emulators,
@@ -61,6 +61,49 @@ Here is CP/M WordStar running on Ubuntu in an xterm:
 ![CP/M WordStar](cpmws.png)
 
 			-- Joe Allen
+
+## cpmtool
+
+This is a tool which allows you to manipulate CP/M disk images.  It
+currently supports two image formats and automatically detects the correct
+format:
+
+* 8 inch CP/M 1.4 floppy images of exactly 256,256 bytes
+	* 128 byte sectors / records
+	* 77 tracks
+	* 26 sectors per track
+	* Two reserved tracks at the beginning
+	* 243 1K blocks
+	* 2 blocks for the directory
+	* 6 unused sectors at the end
+	* Sector interleave: 1,7,13,19,25,5,11,17,23,3,9,15,21,2,8,14,20,26,6,12,18,24,4,10,16,22
+
+* 5 MB ST-506 hard disk image
+	* 128 byte sectors
+	* 64 sectors per track
+	* Two reserved tracks at the beginning
+	* 2442 2K blocks
+	* 16 blocks for the directory
+	* No sector interleave
+
+    Syntax: cpmtool path-to-disk-image command args
+
+    Commands:
+
+      ls [-la1A]                    Directory listing
+                  -l for long
+                  -a to show system files
+                  -1 to show a single name per line
+
+      cat cpm-name                  Type file to console
+
+      get cpm-name [local-name]     Copy file from diskette to local-name
+
+      put local-name [cpm-name]     Copy file to diskette to cpm-name
+
+      free                          Print amount of free space
+
+      rm cpm-name                   Delete a file
 
 # Original README
 
