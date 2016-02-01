@@ -561,7 +561,7 @@ int write_dir(char *name, int extentno, int extent, int rc, int *al)
                         d->al[z] = al[i++];
                 }
         }
-        printf("%s uu=%d s1=%d s2=%d ex=%d rc=%d\n", getname(d), d->uu, d->s1, d->s2, d->ex, d->rc);
+        /* printf("%s uu=%d s1=%d s2=%d ex=%d rc=%d\n", getname(d), d->uu, d->s1, d->s2, d->ex, d->rc); */
         memcpy(buf + ofst * ENTRY_SIZE, d, ENTRY_SIZE);
         putsect(buf, sect);
         return 0;
@@ -830,6 +830,21 @@ void atari_dir(int all, int full, int single)
         }
 }
 
+int mkfs()
+{
+        char buf[SECTOR_SIZE];
+        int x;
+        for (x = 0; x != SECTOR_SIZE; ++x)
+	        buf[x] = 0xe5;
+        int tracks = dpb->off + (((dpb->dsm + 1) << dpb->bsh) + dpb->spt - 1) / dpb->spt;
+        int n = tracks * dpb->spt;
+        printf("%d tracks\n", tracks);
+        printf("%d sectors\n", n);
+        for (x = 0; x != n; ++x)
+                fwrite((char *)buf, SECTOR_SIZE, 1, disk);
+        return 0;
+}
+
 int main(int argc, char *argv[])
 {
         int all = 0;
@@ -838,14 +853,14 @@ int main(int argc, char *argv[])
 	int x;
 	long size;
 	char *disk_name;
-	dpb = &dpb_hd;
+	dpb = &dpb_fd;
 	x = 1;
 	if (x == argc || !strcmp(argv[x], "--help") || !strcmp(argv[x], "-h")) {
                 printf("\nCP/M disk image tool\n");
                 printf("\n");
-                printf("Syntax: cpmtool path-to-disk-image command args\n");
+                printf("Syntax: cpmtool path-to-disk-image [command] [args]\n");
                 printf("\n");
-                printf("  Commands:\n\n");
+                printf("  Commands: (default is ls)\n\n");
                 printf("      ls [-la1]                     Directory listing\n");
                 printf("                  -l for long\n");
                 printf("                  -a to show system files\n");
@@ -855,10 +870,22 @@ int main(int argc, char *argv[])
                 printf("      put local-name [cpm-name]     Copy file from local-name to diskette\n\n");
                 printf("      free                          Print amount of free space\n\n");
                 printf("      rm cpm-name                   Delete a file\n\n");
-                printf("      check                         Check filesystem\n\n");
+                printf("      mkfs                          Format disk\n\n");
                 return -1;
 	}
 	disk_name = argv[x++];
+
+	if (x != argc && !strcmp(argv[x], "mkfs")) {
+	        disk = fopen(disk_name, "w");
+	        if (!disk) {
+	                printf("Couldn't open '%s'\n", disk_name);
+	                return -1;
+	        }
+	        mkfs();
+	        fclose(disk);
+	        return 0;
+	}
+
 	disk = fopen(disk_name, "r+");
 	if (!disk) {
 	        printf("Couldn't open '%s'\n", disk_name);
