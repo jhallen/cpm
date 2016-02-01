@@ -589,6 +589,9 @@ int write_file(char *name, unsigned char *buf, long sects)
 
         // Compute number of extents needed for file
         extents = ((blks * SECTORS_PER_BLOCK) + SECTORS_PER_EXTENT - 1) / SECTORS_PER_EXTENT;
+        // Force at least one extent for case of empty file
+        if (!extents)
+                extents = 1;
 
         // Allocate space for file
         blk_list = (int *)malloc(sizeof(int) * blks);
@@ -627,8 +630,10 @@ int write_file(char *name, unsigned char *buf, long sects)
                         }
                 }
         }
-        /* Write final extent */
-        write_dir(name, extentno, extent_list[extentno], rc, al);
+        if (rc || !extentno) {
+                /* Write final extent */
+                write_dir(name, extentno, extent_list[extentno], rc, al);
+        }
         
         return 0;
 }
