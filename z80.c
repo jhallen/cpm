@@ -104,6 +104,8 @@ static boolean parity_inited = FALSE;
 		setflag(HALF, ((A & MASK4) - (vv & MASK4)) & BIT4);\
 		tt = A - vv;\
 		if ((carry) && (F & CARRY)) tt -= 1;\
+		setflag(OVERFLOW, ((A & BIT7) != (vv & BIT7)) &&\
+			((A & BIT7) != (tt & BIT7)));\
 	}\
 	else\
 	{\
@@ -111,10 +113,10 @@ static boolean parity_inited = FALSE;
 		setflag(HALF, ((A & MASK4) + (vv & MASK4)) & BIT4);\
 		tt = A + vv;\
 		if ((carry) && (F & CARRY)) tt += 1;\
+		setflag(OVERFLOW, ((A & BIT7) == (vv & BIT7)) &&\
+			((A & BIT7) != (tt & BIT7)));\
 	}\
 	setflag(SIGN, tt & BIT7);\
-	setflag(OVERFLOW, ((A & BIT7) == (vv & BIT7)) &&\
-			((A & BIT7) != (tt & BIT7)));\
 	setflag(CARRY, tt & BIT8);\
 	v = tt;\
 	setflag(ZERO, !v);\
