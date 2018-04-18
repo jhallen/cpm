@@ -101,20 +101,30 @@ static boolean parity_inited = FALSE;
 	if (s)\
 	{\
 		flagon(NEGATIVE);\
-		setflag(HALF, ((A & MASK4) - (vv & MASK4)) & BIT4);\
 		tt = A - vv;\
-		if ((carry) && (F & CARRY)) tt -= 1;\
+		hh = (A & MASK4) - (vv & MASK4);\
+		if ((carry) && (F & CARRY)) {\
+			tt -= 1;\
+			hh -= 1;\
+		}\
+		setflag(HALF, hh & BIT4);\
+		setflag(OVERFLOW, ((A & BIT7) != (vv & BIT7)) &&\
+			((A & BIT7) != (tt & BIT7)));\
 	}\
 	else\
 	{\
 		flagoff(NEGATIVE);\
-		setflag(HALF, ((A & MASK4) + (vv & MASK4)) & BIT4);\
 		tt = A + vv;\
-		if ((carry) && (F & CARRY)) tt += 1;\
+		hh = (A & MASK4) + (vv & MASK4);\
+		if ((carry) && (F & CARRY)) {\
+			tt += 1;\
+			hh += 1;\
+		}\
+		setflag(HALF, hh & BIT4);\
+		setflag(OVERFLOW, ((A & BIT7) == (vv & BIT7)) &&\
+			((A & BIT7) != (tt & BIT7)));\
 	}\
 	setflag(SIGN, tt & BIT7);\
-	setflag(OVERFLOW, ((A & BIT7) == (vv & BIT7)) &&\
-			((A & BIT7) != (tt & BIT7)));\
 	setflag(CARRY, tt & BIT8);\
 	v = tt;\
 	setflag(ZERO, !v);\
@@ -171,7 +181,7 @@ boolean
 z80_emulator(z80info *z80, int count)
 {
 	byte t = 0, t1, t2, cy, v, *r = NULL;
-	word tt, tt2, vv, *rr;
+	word tt, tt2, hh, vv, *rr;
 	longword ttt;
 	int i, j, h, n, s;
 
@@ -760,6 +770,7 @@ contsw:
 		break;
 
 	case 0x3F:					/* ccf */
+		setflag(HALF, F & CARRY);
 		setflag(CARRY, !(F & CARRY));
 		flagoff(NEGATIVE);
 		break;
@@ -1731,8 +1742,9 @@ extinstr:
 	/* general purpose arithmetic and cpu control groups */
 
 	case 0x44:					/* neg */
-		A = ~A;
-		arith8(1, 0, 0);
+		t1 = A;
+		A = 0;
+		arith8(t1, 0, 1);
 		A = v;
 		/* flagon(HALF); */
 		flagon(NEGATIVE);
