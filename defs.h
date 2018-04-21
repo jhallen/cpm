@@ -95,6 +95,7 @@ typedef unsigned long longword;
 #define MASK6   0x3F
 #define MASK7   0x7F
 #define MASK8   0xFF
+#define MASK12  0xFFF
 
 #define MASKU4  0xF0
 #define MASK16  0xFFFF

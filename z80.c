@@ -803,8 +803,10 @@ contsw:
 	case 0x29:					/* add hl,hl */
 	case 0x39:					/* add hl,sp */
 		ttt = HL + *REGPAIRSP[(t >> 4) & MASK2];
+		hh = (HL & MASK12) + (*REGPAIRSP[(t >> 4) & MASK2] & MASK12);
 		flagoff(NEGATIVE);
 		setflag(CARRY, ttt & BIT16);
+		setflag(HALF, hh & BIT12);
 		HL = ttt;
 		break;
 
@@ -1605,8 +1607,10 @@ ireginstr:
 		i = *rr;
 		j = *REGPAIRXY[(t >> 4) & MASK2];
 		ttt = i + j;
+		hh = (i & MASK12) + (j & MASK12);
 		flagoff(NEGATIVE);
 		setflag(CARRY, ttt & BIT16);
+		setflag(HALF, hh & BIT12);
 		*rr = ttt;
 		break;
 
@@ -1776,12 +1780,16 @@ extinstr:
 		if (n)
 		{
 			ttt = (int)HL - (int)vv - ((F & CARRY) ? 1 : 0);
+			hh = (int)(HL & MASK12) - (int)(vv & MASK12) -
+			    ((F & CARRY) ? 1 : 0);
 			setflag(OVERFLOW, (HL & BIT15) != (vv & BIT15) &&
 					(vv & BIT15) == (ttt & BIT15));
 		}
 		else
 		{
 			ttt = (int)HL + (int)vv + ((F & CARRY) ? 1 : 0);
+			hh = (int)(HL & MASK12) + (int)(vv & MASK12) +
+			    ((F & CARRY) ? 1 : 0);
 			setflag(OVERFLOW, (HL & BIT15) == (vv & BIT15) &&
 					(vv & BIT15) != (ttt & BIT15));
 		}
@@ -1789,6 +1797,7 @@ extinstr:
 		setflag(ZERO, !ttt);
 		setflag(NEGATIVE, n);
 		setflag(CARRY, ttt & BIT16);
+		setflag(HALF, hh & BIT12);
 		HL = ttt;
 		break;
 
