@@ -669,96 +669,17 @@ contsw:
 
 	/* general purpose arithmetic & CPU control groups */
 
-	case 0x27:					/* daa - this is REALLY messy */
+	case 0x27:					/* daa */
+		i = 0;
 		t = 0x00;
-		if (F & NEGATIVE)
-		{
-			if (F & CARRY)
-			{
-				if (F & HALF)
-				{
-					if ((A & MASKU4) >= 0x60 && (A & MASK4) >= 0x06)
-						t = 0x9A;
-				}
-				else		/* no HALF carry */
-				{
-					if ((A & MASKU4) >= 0x70 && (A & MASK4) <= 0x09)
-						t = 0xA0;
-				}
-			}
-			else			/* no CARRY */
-			{
-				if (F & HALF)
-				{
-					if ((A & MASKU4) <= 0x80 && (A & MASK4) >= 0x06)
-						t = 0xFA;
-				}
-			}
+		if (F & CARRY || A > 0x99) {
+			t |= 0x60;
+			i = 1;
 		}
-		else				/* not NEGATIVE */
-		{
-			if (F & CARRY)
-			{
-				if (F & HALF)
-				{
-					if ((A & MASKU4) <= 0x30 && (A & MASK4) <= 0x03)
-						t = 0x66;
-				}
-				else		/* no HALF */
-				{
-					if ((A & MASKU4) <= 0x20)
-					{
-						if ((A & MASK4) <= 0x09)
-						{
-							t = 0x60;
-						}
-						else
-						{
-							t = 0x66;
-						}
-					}
-				}
-			}
-			else			/* no CARRY */
-			{
-				if (F & HALF)
-				{
-					if ((A & MASK4) <= 0x03)
-					{
-						if ((A & MASKU4) <= 0x90)
-						{
-							t = 0x06;
-						}
-						else
-						{
-							t = 0x66;
-						}
-					}
-				}
-				else		/* no HALF */
-				{
-					if ((A & MASK4) <= 0x09)
-					{
-						if ((A & MASKU4) >= 0xA0)
-							t = 0x60;
-					}
-					else
-					{
-						if ((A & MASKU4) <= 0x80)
-						{
-							t = 0x06;
-						}
-						else
-						{
-							t = 0x66;
-						}
-					}
-				}
-			}
-		}
-		i = F & NEGATIVE;
-		arith8(t, 0, 0);
-		F |= i;
+		if (F & HALF || (A & MASK4) > 9)
+			t |= 0x06;
+		arith8(t, 0, F & NEGATIVE);
+		setflag(CARRY, i);
 		A = v;
 		setparity(A);
 		break;
