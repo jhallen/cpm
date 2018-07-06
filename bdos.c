@@ -171,13 +171,14 @@ static void storefp(z80info *z80, FILE *fp, unsigned where) {
     stfps[ind].name[11] = '\0';
 }
 
-static FILE *getfp(z80info *z80, unsigned where) {
+// Lookup an FCB to find the host file.
+
+static FILE *lookfp(z80info *z80, unsigned where) {
     int i;
     for (i = 0; i < storedfps; ++i)
-	if (stfps[i].where == where) {
-	    /* check name? */
+	if (stfps[i].where == where)
+            if (memcmp(stfps[i].name, z80->mem+z80->regde+1, 11) == 0)
 	    return stfps[i].fp;
-	}
     /* fcb not found. maybe it has been moved? */
     for (i = 0; i < storedfps; ++i)
 	if (stfps[i].where != 0xffffU &&
@@ -185,6 +186,13 @@ static FILE *getfp(z80info *z80, unsigned where) {
 	    stfps[i].where = where;	/* moved FCB */
 	    return stfps[i].fp;
 	}
+    return NULL;
+}
+
+// Report an error finding an FCB.
+
+static void fcberr(z80info *z80, unsigned where) {
+    int i;
 
     fprintf(stderr, "error: cannot find fp entry for FCB at %04x"
 	    " fctn %d, FCB named %s\n", where, z80->regbc & 0xff,
@@ -196,6 +204,16 @@ static FILE *getfp(z80info *z80, unsigned where) {
     exit(1);
 }
 
+// Get the host file for an FCB when it should be open.
+
+static FILE *getfp(z80info *z80, unsigned where) {
+    FILE *fp;
+
+    if (!(fp = lookfp(z80, where)))
+        fcberr(z80, where);
+    return fp;
+}
+
 static void delfp(z80info *z80, unsigned where) {
     int i;
     for (i = 0; i < storedfps; ++i)
@@ -203,9 +221,7 @@ static void delfp(z80info *z80, unsigned where) {
 	    stfps[i].where = 0xffffU;
 	    return;
 	}
-    fprintf(stderr, "error: cannot del fp entry for FCB at %04x\n", where);
-    resetterm();
-    exit(1);
+    fcberr(z80, where);
 }
 
 /* FCB fields */
@@ -516,12 +532,23 @@ void check_BDOS_hook(z80info *z80) {
 
     case 13:	/* reset disk system */
 	/* storedfps = 0; */	/* WS crashes then */
-	if (dp)
-	    closedir(dp);
-	dp = NULL;
-	z80->dma = 0x80;
 	HL = 0;
         B = H; A = L;
+	if (dp)
+	    closedir(dp);
+	{   struct dirent *de;
+            if ((dp = opendir("."))) {
+                while ((de = readdir(dp))) {
+                    if (strchr(de->d_name, '$')) {
+                        A = 0xff;
+                        break;
+                    }
+                }
+                closedir(dp);
+            }
+        }
+	dp = NULL;
+	z80->dma = 0x80;
 	/* select only A:, all r/w */
 	break;
     case 14:	/* select disk */
@@ -531,14 +558,17 @@ void check_BDOS_hook(z80info *z80) {
     case 15:	/* open file */
 	mode = "r+b";
     fileio:
-	FCB_to_filename(z80->mem+DE, name); /* Try lowercase */
+        /* check if the file is already open */
+        if (!(fp = lookfp(z80, DE))) {
+            /* not already open - try lowercase */
+            FCB_to_filename(z80->mem+DE, name);
 	if (!(fp = fopen(name, mode))) {
 	    FCB_to_ufilename(z80->mem+DE, name); /* Try all uppercase instead */
             if (!(fp = fopen(name, mode))) {
 	            FCB_to_filename(z80->mem+DE, name);
 		    if (*mode == 'r') {
 			char ss[50];
-			sprintf(ss, "%s/%s", CPMLIBDIR, name);
+			snprintf(ss, sizeof(ss), "%s/%s", CPMLIBDIR, name);
 			fp = fopen(ss, mode);
 			if (!fp)
 			  fp = fopen(ss, "rb");
@@ -551,6 +581,9 @@ void check_BDOS_hook(z80info *z80) {
 			break;
 		    }
             }
+            }
+            /* where to store fp? */
+            storefp(z80, fp, DE);
 	}
 	/* success */
 
@@ -573,23 +606,36 @@ void check_BDOS_hook(z80info *z80) {
             B = H; A = L;
 	    F = 0;
 	    fclose(fp);
+            delfp(z80, DE);
 	    break;
 	}
 	HL = 0;
         B = H; A = L;
 	F = 0;
-	/* where to store fp? */
-	storefp(z80, fp, DE);
 	/* printf("opening file %s\n", name); */
 	break;
     case 16:	/* close file */
-    	z80->mem[DE + FCB_S2] &= 0x7F; /* Clear high bit: indicates closed */
-	fp = getfp(z80, DE);
+        {
+            size_t host_size, host_exts;
+	    fp = getfp(z80, DE);
+            fseek(fp, 0, SEEK_END);
+            host_size = ftell(fp);
+            host_exts = SEQ_EXTENT(host_size);
+            if (host_exts == SEQ_EXT) {
+                /* this is the last extent of the file so we allow the
+                   CP/M program to truncate it by reducing RC */
+                if (z80->mem[DE + FCB_RC] < SEQ_CR(host_size)) {
+                    host_size = (16384L * SEQ_EXT + 128L * (long)z80->mem[DE + FCB_RC]);
+                    ftruncate(fileno(fp), host_size);
+                }
+            }
 	delfp(z80, DE);
 	fclose(fp);
+            z80->mem[DE + FCB_S2] &= 0x7F; /* Clear high bit: indicates closed */
 	HL = 0;
         B = H; A = L;
 	/* printf("close file\n"); */
+        }
 	break;
     case 17:	/* search for first */
 	if (dp)
@@ -689,6 +735,7 @@ void check_BDOS_hook(z80info *z80) {
 	    z80->mem[DE + FCB_CR] = SEQ_CR(ofst);
 	    z80->mem[DE + FCB_EX] = SEQ_EX(ofst);
 	    z80->mem[DE + FCB_S2] = (0x80 | SEQ_S2(ofst));
+            fflush(fp);
 	    fixrc(z80, fp);
 	    HL = 0x00;
             B = H; A = L;
