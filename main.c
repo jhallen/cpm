@@ -119,7 +119,7 @@ initterm(void)
 	rawterm.c_cc[VQUIT] = -1;
 	rawterm.c_cc[VERASE] = -1;
 	rawterm.c_cc[VKILL] = -1;
-
+	}
 	// tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
 
 #if 0
@@ -268,7 +268,7 @@ loop:	/* "infinite" loop */
 		}
 
 		break;
-	
+
 	case 'w':			/* write memory to file */
 		printf("    Starting at loc? ");
 		jgets(str, sizeof(str), stdin);
@@ -416,7 +416,7 @@ loop:	/* "infinite" loop */
 			po++;
 		}
 		break;
-			
+
 	case 'r':				/* set a register */
 		printf("    Value? = ");
 		jgets(str, sizeof(str), stdin);
@@ -438,7 +438,7 @@ loop:	/* "infinite" loop */
 		case 'e': E = i; break;
 		case 'h': H = i; break;
 		case 'l': L = i; break;
-		case 'i': 
+		case 'i':
 			if (tolower(((unsigned char *)s)[1]) == 'x')
 				IX = i;
 			else if (tolower(((unsigned char *)s)[1]) == 'y')
@@ -751,7 +751,7 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 		{
 #if defined macintosh
 			EventRecord ev;
-			
+
 		again:
 			fflush(stdout);
 
@@ -798,7 +798,7 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 
 	/* return 0xFF if we have a character waiting to be read - save the
 	   character in "last" for 0x00 above */
-	case 0x01: 
+	case 0x01:
 #if defined macintosh
 		{
 			EventRecord ev;
@@ -841,8 +841,8 @@ void
 output(z80info *z80, byte haddr, byte laddr, byte data)
 {
 	if (laddr == 0xFF) {
-		/* BIOS call - interrupt the z80 before the next instruction 
-		   since we may have to mess with the PC & other stuff - 
+		/* BIOS call - interrupt the z80 before the next instruction
+		   since we may have to mess with the PC & other stuff -
 		   otherwise we would do it right here */
 		z80->event = TRUE;
 		z80->halt = TRUE;
@@ -881,7 +881,7 @@ void
 haltcpu(z80info *z80)
 {
 	z80->halt = FALSE;
-	
+
 	/* we were interrupted by a Unix signal */
 	if (z80->sig)
 	{
@@ -1020,7 +1020,7 @@ interrupt(int s)
 
 
 /*-----------------------------------------------------------------------*\
- |  main  --  set up the global vars & run the z80 
+ |  main  --  set up the global vars & run the z80
 \*-----------------------------------------------------------------------*/
 
 int
