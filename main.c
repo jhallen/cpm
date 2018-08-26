@@ -54,6 +54,7 @@ static FILE *logfile = NULL;
 #endif
 static struct termio rawterm, oldterm;	/* for raw terminal I/O */
 #endif
+static int have_term = 1;   /* FALSE if terminal initialization failed */
 
 
 static void dumptrace(z80info *z80);
@@ -78,6 +79,7 @@ char *jgets(char *s, int len, FILE *f)
 void
 resetterm(void)
 {
+    if (have_term)
 	tcsetattr(fileno(stdin), TCSADRAIN, &oldterm);
 }
 
@@ -90,6 +92,7 @@ resetterm(void)
 void
 setterm(void)
 {
+    if (have_term)
 	tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
 }
 
@@ -105,9 +108,10 @@ initterm(void)
 {
 	if (tcgetattr(fileno(stdin), &oldterm))
 	{
-		fprintf(stderr, "Sorry, Must be using a terminal.\n");
-		exit(1);
+		fprintf(stderr, "Sorry, terminal not found, using cooked mode.\n");
+		have_term = 0;
 	}
+        else {
 	rawterm = oldterm;
 	rawterm.c_iflag &= ~(ICRNL | IXON | IXOFF | INLCR | ICRNL);
 	rawterm.c_lflag &= ~(ICANON | ECHO);
