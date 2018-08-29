@@ -6,6 +6,12 @@
 # -DMEM_BREAK		support memory-mapped I/O and breakpoints,
 #				which will noticably slow down emulation
 
+ifeq ($(OS),Windows_NT)
+  EXE 		:= .exe
+else
+  EXE 		:=
+endif
+
 CC = gcc
 CFLAGS = -g -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK
 LDFLAGS = 
@@ -21,13 +27,13 @@ OBJS =	bios.o \
 	bdos.o \
 	z80.o
 
-all: cpm cpmtool
+all: cpm$(EXE) cpmtool$(EXE)
 
-cpmtool: cpmtool.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o cpmtool cpmtool.o
+cpmtool$(EXE): cpmtool.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o cpmtool$(EXE) cpmtool.o
 
-cpm: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o cpm $(OBJS)
+cpm$(EXE): $(OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o cpm$(EXE) $(OBJS)
 
 
 bios.o:		bios.c defs.h cpmdisc.h cpm.c
@@ -36,7 +42,7 @@ disassem.o:	disassem.c defs.h
 main.o:		main.c defs.h
 
 clean:
-	rm -f cpm cpmtool *.o *~
+	rm -f cpm$(EXE) cpmtool$(EXE) *.o *~
 
 tags:	$(FILES)
 	cxxtags *.[hc]
