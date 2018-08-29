@@ -27,6 +27,8 @@
 #	endif
 #elif defined DJGPP
 #	include <pc.h>
+#elif defined _WIN32
+#
 #else	/* UNIX */
 #	include <unistd.h>
 #	include <sys/ioctl.h>
@@ -48,14 +50,20 @@ extern int errno;
 static FILE *logfile = NULL;
 
 
-#if defined UNIX || defined BeBox
-#ifdef POSIX_TTY
-#	define termio termios
-#endif
+#ifndef _WIN32
+#  if defined UNIX || defined BeBox
+#    ifdef POSIX_TTY
+#	   define termio termios
+#    endif
 static struct termio rawterm, oldterm;	/* for raw terminal I/O */
+#  endif
 #endif
-static int have_term = 1;   /* FALSE if terminal initialization failed */
 
+#ifdef _WIN32
+static int have_term = 0;   /* no terminal in Win32 */
+#else
+static int have_term = 1;   /* FALSE if terminal initialization failed */
+#endif
 
 static void dumptrace(z80info *z80);
 
@@ -79,8 +87,10 @@ char *jgets(char *s, int len, FILE *f)
 void
 resetterm(void)
 {
+#ifndef _WIN32
     if (have_term)
-	tcsetattr(fileno(stdin), TCSADRAIN, &oldterm);
+		tcsetattr(fileno(stdin), TCSADRAIN, &oldterm);
+#endif
 }
 
 
@@ -92,8 +102,10 @@ resetterm(void)
 void
 setterm(void)
 {
+#ifndef _WIN32
     if (have_term)
-	tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
+		tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
+#endif
 }
 
 
@@ -106,6 +118,10 @@ setterm(void)
 static void
 initterm(void)
 {
+#ifdef _WIN32
+		fprintf(stderr, "Sorry, terminal not found, using cooked mode.\n");
+		have_term = 0;
+#else
 	if (tcgetattr(fileno(stdin), &oldterm))
 	{
 		fprintf(stderr, "Sorry, terminal not found, using cooked mode.\n");
@@ -138,6 +154,7 @@ initterm(void)
 	rawterm.c_cc[VKILL] = -1;
 	rawterm.c_cc[VMIN] = 1;		/* MIN number of chars */
 	rawterm.c_cc[VTIME] = 0;	/* TIME timeout value */
+#endif
 #endif
 }
 
