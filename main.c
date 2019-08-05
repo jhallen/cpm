@@ -116,7 +116,7 @@ initterm(void)
 	rawterm.c_cc[VERASE] = -1;
 	rawterm.c_cc[VKILL] = -1;
 
-	// tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
+	/* tcsetattr(fileno(stdin), TCSADRAIN, &rawterm); */
 
 #if 0
 	/* rawterm.c_lflag &= ~(ISIG | ICANON | ECHO); */
@@ -148,7 +148,7 @@ initterm(void)
 static void
 command(z80info *z80)
 {
-	int i, j, t, e;
+	unsigned int i, j, t, e;
 	char str[256], *s;
 	FILE *fp;
 	static word pe = 0;
@@ -307,7 +307,7 @@ loop:	/* "infinite" loop */
 
 		sscanf(str, "%x", &t);
 
-		if (t < 0 || t >= sizeof z80->mem)
+		if (t >= sizeof z80->mem)
 		{
 			printf("Cannot set breakpoint at addr 0x%X\n", t);
 			break;
@@ -341,7 +341,7 @@ loop:	/* "infinite" loop */
 
 		sscanf(str, "%x", &t);
 
-		if (t < 0 || t >= sizeof z80->mem)
+		if (t >= sizeof z80->mem)
 		{
 			printf("    Cannot clear breakpoint at addr 0x%X\n", t);
 			break;
@@ -370,7 +370,7 @@ loop:	/* "infinite" loop */
 			printf("  %.4X:    ", pe);
 			j = pe;
 			pe += disassem(z80, pe, stdout);
-			t = disassemlen(z80);
+			t = disassemlen();
 
 			while (t++ < 15)
 				putchar(' ');
@@ -734,7 +734,7 @@ loadfile(z80info *z80, const char *fname)
 boolean
 input(z80info *z80, byte haddr, byte laddr, byte *val)
 {
-	int data;
+	unsigned int data;
 
 	/* just uses the lower 8-bits of the I/O address for now... */
 	switch (laddr)
@@ -777,14 +777,14 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 #else	/* TCGETA */
 			fflush(stdout);
 			data = kget(0);
-//			data = getchar();
+			/* data = getchar(); */
 
-			while ((data < 0 && errno == EINTR) ||
+			while ((data > 0x7f && errno == EINTR) ||
 					data == INTR_CHAR)
 			{
 				command(z80);
 				data = kget(0);
-//				data = getchar();
+				/* data = getchar(); */
 			}
 #endif
 		}
@@ -855,7 +855,7 @@ output(z80info *z80, byte haddr, byte laddr, byte data)
 		}
 	} else if (laddr == 0) {
 		/* output a character to the screen */
-		// putchar(data);
+		/* putchar(data); */
 		vt52(data);
 
 		if (logfile != NULL)
@@ -1028,7 +1028,7 @@ main(int argc, const char *argv[])
 
 	cmd[0] = 0;
 
-	for (x = 1; argv[x]; ++x) {
+	for (x = 1; x < argc; ++x) {
 		if (argv[x][0] == '-' && argv[x][1] == '-') {
 			if (!strcmp(argv[x], "--help")) {
 				help = 1;

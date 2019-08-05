@@ -584,26 +584,26 @@ int write_file(char *name, unsigned char *buf, long sects)
         int al[16]; /* Allocation map for current extent */
 
 
-        // Compute number of blocks needed for file
+        /* Compute number of blocks needed for file */
         blks = (sects + SECTORS_PER_BLOCK - 1) / SECTORS_PER_BLOCK;
 
-        // Compute number of extents needed for file
+        /* Compute number of extents needed for file */
         extents = ((blks * SECTORS_PER_BLOCK) + SECTORS_PER_EXTENT - 1) / SECTORS_PER_EXTENT;
-        // Force at least one extent for case of empty file
+        /* Force at least one extent for case of empty file */
         if (!extents)
                 extents = 1;
 
-        // Allocate space for file
+        /* Allocate space for file */
         blk_list = (int *)malloc(sizeof(int) * blks);
         if (alloc_space(blk_list, blks))
                 return -1;
 
-        // Allocate extents for file
+        /* Allocate extents for file */
         extent_list = (int *)malloc(sizeof(int) * extents);
         if (alloc_extents(extent_list, extents))
                 return -1;
 
-        // Write file
+        /* Write file */
         for (z = 0; z != 16; ++z)
                 al[z] = 0;
         blkno = 0;
@@ -663,12 +663,12 @@ int put_file(char *local_name, char *atari_name)
                 return -1;
         }
         rewind(f);
-        // Round up to a multiple of (SECTOR_SIZE)
+        /* Round up to a multiple of (SECTOR_SIZE) */
         up = size + (SECTOR_SIZE) - 1;
         up -= up % (SECTOR_SIZE);
 
         buf = (unsigned char *)malloc(up);
-        if (size != fread(buf, 1, size, f)) {
+        if (fread(buf, 1, size, f) != (size_t)size) {
                 printf("Couldn't read file '%s'\n", local_name);
                 fclose(f);
                 free(buf);
@@ -837,12 +837,12 @@ void atari_dir(int all, int full, int single)
 
 int mkfs()
 {
-        char buf[SECTOR_SIZE];
-        int x;
+        unsigned char buf[SECTOR_SIZE];
+        int tracks, x, n;
         for (x = 0; x != SECTOR_SIZE; ++x)
 	        buf[x] = 0xe5;
-        int tracks = dpb->off + (((dpb->dsm + 1) << dpb->bsh) + dpb->spt - 1) / dpb->spt;
-        int n = tracks * dpb->spt;
+        tracks = dpb->off + (((dpb->dsm + 1) << dpb->bsh) + dpb->spt - 1) / dpb->spt;
+        n = tracks * dpb->spt;
         printf("%d tracks\n", tracks);
         printf("%d sectors\n", n);
         for (x = 0; x != n; ++x)

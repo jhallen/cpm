@@ -171,7 +171,7 @@ static void storefp(z80info *z80, FILE *fp, unsigned where) {
     stfps[ind].name[11] = '\0';
 }
 
-// Lookup an FCB to find the host file.
+/* Lookup an FCB to find the host file. */
 
 static FILE *lookfp(z80info *z80, unsigned where) {
     int i;
@@ -189,7 +189,7 @@ static FILE *lookfp(z80info *z80, unsigned where) {
     return NULL;
 }
 
-// Report an error finding an FCB.
+/* Report an error finding an FCB. */
 
 static void fcberr(z80info *z80, unsigned where) {
     int i;
@@ -204,7 +204,7 @@ static void fcberr(z80info *z80, unsigned where) {
     exit(1);
 }
 
-// Get the host file for an FCB when it should be open.
+/* Get the host file for an FCB when it should be open. */
 
 static FILE *getfp(z80info *z80, unsigned where) {
     FILE *fp;
@@ -330,20 +330,20 @@ char *bdos_decode(int n)
 int bdos_fcb(int n)
 {
 	switch (n) {
-	    case 15: return 1; // "open file";
-	    case 16: return 1; // "close file";
-	    case 17: return 1; // "search for first";
-	    case 18: return 1; // "search for next";
-	    case 19: return 1; // "delete file (no wildcards yet)";
-	    case 20: return 1; // "read sequential";
-	    case 21: return 1; // "write sequential";
-	    case 22: return 1; // "make file";
-	    case 23: return 1; // "rename file";
-	    case 30: return 1; // set attribute
-	    case 33: return 1; // "read random record";
-	    case 34: return 1; // "write random record";
-	    case 35: return 1; // "compute file size";
-	    case 36: return 1; // "set random record";
+	    case 15: return 1; /* "open file"; */
+	    case 16: return 1; /* "close file"; */
+	    case 17: return 1; /* "search for first"; */
+	    case 18: return 1; /* "search for next"; */
+	    case 19: return 1; /* "delete file (no wildcards yet)"; */
+	    case 20: return 1; /* "read sequential"; */
+	    case 21: return 1; /* "write sequential"; */
+	    case 22: return 1; /* "make file"; */
+	    case 23: return 1; /* "rename file"; */
+	    case 30: return 1; /* set attribute */
+	    case 33: return 1; /* "read random record"; */
+	    case 34: return 1; /* "write random record"; */
+	    case 35: return 1; /* "compute file size"; */
+	    case 36: return 1; /* "set random record"; */
 	    default: return 0;
 	}
 }
@@ -467,7 +467,7 @@ void check_BDOS_hook(z80info *z80) {
             B = H; A = L;
 	    F = 0;
 	    break;
-	}
+	} /* FALLTHRU */
 	case 0xfd:  HL = kget(0);
             B = H; A = L;
 	    F = 0;
@@ -616,7 +616,7 @@ void check_BDOS_hook(z80info *z80) {
 	break;
     case 16:	/* close file */
         {
-            size_t host_size, host_exts;
+            long host_size, host_exts;
 	    fp = getfp(z80, DE);
             fseek(fp, 0, SEEK_END);
             host_size = ftell(fp);

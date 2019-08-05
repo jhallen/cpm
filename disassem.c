@@ -281,7 +281,7 @@ put_qq_reg(int reg_num)
 }
 
 int
-disassemlen(z80info *z80)
+disassemlen(void)
 {
 	return str_length;
 }

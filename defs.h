@@ -127,7 +127,7 @@ typedef unsigned long longword;
 typedef struct z80info
 {
     boolean event;
-//    byte regaf[2], regbc[2], regde[2], reghl[2];
+ /* byte regaf[2], regbc[2], regde[2], reghl[2]; */
     word regaf, regbc, regde, reghl;
     word regaf2, regbc2, regde2, reghl2;
     word regsp, regpc, regix, regiy;
@@ -275,13 +275,13 @@ extern void undefinstr(z80info *z80, byte instr);
 extern boolean loadfile(z80info *z80, const char *fname);
 
 /* bios.c */
-extern void bios(z80info *z80, int fn);
+extern void bios(z80info *z80, unsigned int fn);
 extern void sysreset(z80info *z80);
 extern void warmboot(z80info *z80);
 extern void finish(z80info *z80);
 
 /* disassem.c */
-extern int disassemlen(z80info *z80);
+extern int disassemlen(void);
 extern int disassem(z80info *z80, word start, FILE *fp);
 
 /* bdos */
