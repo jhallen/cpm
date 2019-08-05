@@ -27,6 +27,8 @@
 #	endif
 #elif defined DJGPP
 #	include <pc.h>
+#elif defined _WIN32
+#
 #else	/* UNIX */
 #	include <unistd.h>
 #	include <sys/ioctl.h>
@@ -48,13 +50,20 @@ extern int errno;
 static FILE *logfile = NULL;
 
 
-#if defined UNIX || defined BeBox
-#ifdef POSIX_TTY
-#	define termio termios
-#endif
+#ifndef _WIN32
+#  if defined UNIX || defined BeBox
+#    ifdef POSIX_TTY
+#	   define termio termios
+#    endif
 static struct termio rawterm, oldterm;	/* for raw terminal I/O */
+#  endif
 #endif
 
+#ifdef _WIN32
+static int have_term = 0;   /* no terminal in Win32 */
+#else
+static int have_term = 1;   /* FALSE if terminal initialization failed */
+#endif
 
 static void dumptrace(z80info *z80);
 
@@ -78,7 +87,10 @@ char *jgets(char *s, int len, FILE *f)
 void
 resetterm(void)
 {
-	tcsetattr(fileno(stdin), TCSADRAIN, &oldterm);
+#ifndef _WIN32
+    if (have_term)
+		tcsetattr(fileno(stdin), TCSADRAIN, &oldterm);
+#endif
 }
 
 
@@ -90,7 +102,10 @@ resetterm(void)
 void
 setterm(void)
 {
-	tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
+#ifndef _WIN32
+    if (have_term)
+		tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
+#endif
 }
 
 
@@ -103,11 +118,16 @@ setterm(void)
 static void
 initterm(void)
 {
+#ifdef _WIN32
+		fprintf(stderr, "Sorry, terminal not found, using cooked mode.\n");
+		have_term = 0;
+#else
 	if (tcgetattr(fileno(stdin), &oldterm))
 	{
-		fprintf(stderr, "Sorry, Must be using a terminal.\n");
-		exit(1);
+		fprintf(stderr, "Sorry, terminal not found, using cooked mode.\n");
+		have_term = 0;
 	}
+        else {
 	rawterm = oldterm;
 	rawterm.c_iflag &= ~(ICRNL | IXON | IXOFF | INLCR | ICRNL);
 	rawterm.c_lflag &= ~(ICANON | ECHO);
@@ -115,7 +135,7 @@ initterm(void)
 	rawterm.c_cc[VQUIT] = -1;
 	rawterm.c_cc[VERASE] = -1;
 	rawterm.c_cc[VKILL] = -1;
-
+	}
 	// tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
 
 #if 0
@@ -134,6 +154,7 @@ initterm(void)
 	rawterm.c_cc[VKILL] = -1;
 	rawterm.c_cc[VMIN] = 1;		/* MIN number of chars */
 	rawterm.c_cc[VTIME] = 0;	/* TIME timeout value */
+#endif
 #endif
 }
 
@@ -264,7 +285,7 @@ loop:	/* "infinite" loop */
 		}
 
 		break;
-	
+
 	case 'w':			/* write memory to file */
 		printf("    Starting at loc? ");
 		jgets(str, sizeof(str), stdin);
@@ -412,7 +433,7 @@ loop:	/* "infinite" loop */
 			po++;
 		}
 		break;
-			
+
 	case 'r':				/* set a register */
 		printf("    Value? = ");
 		jgets(str, sizeof(str), stdin);
@@ -434,7 +455,7 @@ loop:	/* "infinite" loop */
 		case 'e': E = i; break;
 		case 'h': H = i; break;
 		case 'l': L = i; break;
-		case 'i': 
+		case 'i':
 			if (tolower(((unsigned char *)s)[1]) == 'x')
 				IX = i;
 			else if (tolower(((unsigned char *)s)[1]) == 'y')
@@ -747,7 +768,7 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 		{
 #if defined macintosh
 			EventRecord ev;
-			
+
 		again:
 			fflush(stdout);
 
@@ -794,7 +815,7 @@ input(z80info *z80, byte haddr, byte laddr, byte *val)
 
 	/* return 0xFF if we have a character waiting to be read - save the
 	   character in "last" for 0x00 above */
-	case 0x01: 
+	case 0x01:
 #if defined macintosh
 		{
 			EventRecord ev;
@@ -837,8 +858,8 @@ void
 output(z80info *z80, byte haddr, byte laddr, byte data)
 {
 	if (laddr == 0xFF) {
-		/* BIOS call - interrupt the z80 before the next instruction 
-		   since we may have to mess with the PC & other stuff - 
+		/* BIOS call - interrupt the z80 before the next instruction
+		   since we may have to mess with the PC & other stuff -
 		   otherwise we would do it right here */
 		z80->event = TRUE;
 		z80->halt = TRUE;
@@ -877,7 +898,7 @@ void
 haltcpu(z80info *z80)
 {
 	z80->halt = FALSE;
-	
+
 	/* we were interrupted by a Unix signal */
 	if (z80->sig)
 	{
@@ -1016,7 +1037,7 @@ interrupt(int s)
 
 
 /*-----------------------------------------------------------------------*\
- |  main  --  set up the global vars & run the z80 
+ |  main  --  set up the global vars & run the z80
 \*-----------------------------------------------------------------------*/
 
 int
