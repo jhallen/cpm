@@ -1,0 +1,4 @@
+**/*.o
+cpm
+cpmtool
+nbproject/*

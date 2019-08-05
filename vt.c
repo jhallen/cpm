@@ -17,15 +17,19 @@ int kpoll(int w)
 		return c;
 	}
 	for (tries = 0; tries != 1; ++tries) {
+#ifndef _WIN32
 		int flags;
 		if (w) {
 			flags = fcntl(fileno(stdin), F_GETFL);
 			fcntl(fileno(stdin), F_SETFL, flags | O_NONBLOCK);
 		}
+#endif
 		c = read(fileno(stdin), &d, 1);
+#ifndef _WIN32
 		if (w) {
 			fcntl(fileno(stdin), F_SETFL, flags);
 		}
+#endif
 		if (c == 1) {
 /*			printf("\r\nkpoll got %d \r\n", d); */
 			return d;
