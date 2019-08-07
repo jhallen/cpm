@@ -23,8 +23,8 @@
 #   define BeBox
 #elif defined MSDOS && defined GO32
 #	define DJGPP
-#	ifndef LITTLE_ENDIAN
-#		define LITTLE_ENDIAN
+#	ifndef ENDIAN_LITTLE
+#		define ENDIAN_LITTLE
 #	endif
 #else
 #	define UNIX	/* cannot use "unix" since DJGPP defines it as well */
@@ -34,9 +34,11 @@
 /* some headers define macros this way */
 #ifdef BYTE_ORDER
 #   if BYTE_ORDER == LITTLE_ENDIAN
-#      undef BIG_ENDIAN
+#      ifndef ENDIAN_LITTLE
+#         define ENDIAN_LITTLE
+#      endif
 #   else
-#      undef LITTLE_ENDIAN
+#      undef ENDIAN_LITTLE
 #   endif
 #endif
 
@@ -206,7 +208,7 @@ typedef struct z80info
 
 /* how to access the z80 registers & register pairs */
 
-#ifdef LITTLE_ENDIAN
+#ifdef ENDIAN_LITTLE
 #  define A	((unsigned char *)&z80->regaf)[1]
 #  define F	((unsigned char *)&z80->regaf)[0]
 #  define B	((unsigned char *)&z80->regbc)[1]

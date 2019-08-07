@@ -1,7 +1,7 @@
 # optional CFLAGS include: -O -g -Wall
 # -DNO_LARGE_SWITCH	compiler cannot handle really big switch statements
 #			so break them into smaller pieces
-# -DLITTLE_ENDIAN	machine's byte-sex is like x86 instead of 68k
+# -DENDIAN_LITTLE	machine's byte-sex is like x86 instead of 68k
 # -DPOSIX_TTY		use Posix termios instead of older termio (FreeBSD)
 # -DMEM_BREAK		support memory-mapped I/O and breakpoints,
 #				which will noticably slow down emulation
@@ -15,7 +15,7 @@ endif
 CC = gcc
 CFLAGS = -g -pipe -Wall -Wextra -pedantic -ansi \
 	 -D_POSIX_C_SOURCE=200809L -DPOSIX_TTY \
-	 -DLITTLE_ENDIAN -DMEM_BREAK
+	 -DENDIAN_LITTLE -DMEM_BREAK
 LDFLAGS = 
 
 FILES = README.md Makefile A-Hdrive B-Hdrive cpmws.png \
