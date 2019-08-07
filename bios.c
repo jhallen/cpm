@@ -115,7 +115,7 @@ closeall(z80info *z80)
 void
 warmboot(z80info *z80)
 {
-	int i;
+	unsigned int i;
 
 	closeall(z80);
 
@@ -344,12 +344,14 @@ list(z80info *z80)
 static void
 punch(z80info *z80)
 {
+	(void)z80;
 }
 
 /* return reader char in A, ^Z is EOF */
 static void
 reader(z80info *z80)
 {
+	(void)z80;
 	A = CNTL('Z');
 }
 
@@ -886,6 +888,7 @@ closeunix(z80info *z80)
 void
 finish(z80info *z80)
 {
+	(void)z80;
 	resetterm();
 	exit(0);
 }
@@ -930,7 +933,7 @@ dotime(z80info *z80)
 }
 
 void
-bios(z80info *z80, int fn)
+bios(z80info *z80, unsigned int fn)
 {
 	static void (*bioscall[])(z80info *z80) =
 	{
@@ -960,7 +963,7 @@ bios(z80info *z80, int fn)
 		dotime		/* 23 */
 	};
 
-	if (fn < 0 || fn >= sizeof bioscall / sizeof *bioscall)
+	if (fn >= sizeof bioscall / sizeof *bioscall)
 	{
 		fprintf(stderr, "Illegal BIOS call %d\r\n", fn);
 		return;

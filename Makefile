@@ -13,7 +13,9 @@ else
 endif
 
 CC = gcc
-CFLAGS = -g -pipe -Wall -DPOSIX_TTY -DLITTLE_ENDIAN -DMEM_BREAK
+CFLAGS = -g -pipe -Wall -Wextra -pedantic -ansi \
+	 -D_POSIX_C_SOURCE=200809L -DPOSIX_TTY \
+	 -DLITTLE_ENDIAN -DMEM_BREAK
 LDFLAGS = 
 
 FILES = README.md Makefile A-Hdrive B-Hdrive cpmws.png \
