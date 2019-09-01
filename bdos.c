@@ -21,7 +21,20 @@ unsigned short usercode = 0x00;
 int restricted_mode = 0;
 int silent_exit = 0;
 char *stuff_cmd = 0;
+int exec = 0;
 int trace_bdos = 0;
+
+/* Kill CP/M command line prompt */
+
+static void killprompt()
+{
+    vt52('\b');
+    vt52(' ');
+    vt52('\b');
+    vt52('\b');
+    vt52(' ');
+    vt52('\b');
+}
 
 char *rdcmdline(z80info *z80, int max, int ctrl_c_enable)
 {
@@ -33,19 +46,18 @@ char *rdcmdline(z80info *z80, int max, int ctrl_c_enable)
     i = 1;      /* number of next character */
 
     if (stuff_cmd) {
-    	/* Kill prompt */
-    	vt52('\b');
-    	vt52(' ');
-    	vt52('\b');
-    	vt52('\b');
-    	vt52(' ');
-    	vt52('\b');
+        killprompt();
     	strcpy(s + i, stuff_cmd);
     	/* printf("'%s'\n", stuff_cmd); */
     	i = 1 + strlen(s + i);
     	stuff_cmd = 0;
     	silent_exit = 1;
     	goto hit_rtn;
+    } else if (exec) {
+        killprompt();
+        printf("\r\n");
+        finish(z80);
+        return s;
     }
 
 loop:

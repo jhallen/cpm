@@ -1053,6 +1053,8 @@ main(int argc, const char *argv[])
 		if (argv[x][0] == '-' && argv[x][1] == '-') {
 			if (!strcmp(argv[x], "--help")) {
 				help = 1;
+			} else if (!strcmp(argv[x], "--exec")) {
+				exec = 1;
 			} else if (!strcmp(argv[x], "--nobdos")) {
 				nobdos = 1;
 			} else if (!strcmp(argv[x], "--trace_bdos")) {
@@ -1077,6 +1079,7 @@ main(int argc, const char *argv[])
 		fprintf(stderr, "\n%s [options] [CP/M command]\n", argv[0]);
 		fprintf(stderr, "\n   Options:\n\n");
 		fprintf(stderr, "    --help         Show this help\n");
+		fprintf(stderr, "    --exec         Execute the command and exit\n");
 		fprintf(stderr, "    --nobdos       Do not emulate BDOS: only emulate BIOS\n");
 		fprintf(stderr, "                   Real disk images will be used.        \n");
 		fprintf(stderr, "    --trace_bdos   Trace BDOS calls\n");
