@@ -785,20 +785,11 @@ void check_BDOS_hook(z80info *z80) {
         } else {
             HL = 0x00;
         }
-        B = H; A = L;
-
-/*
-	    z80->mem[DE + FCB_CR] = SEQ_CR(ofst);
-	    z80->mem[DE + FCB_EX] = SEQ_EX(ofst);
-	    z80->mem[DE + FCB_S2] = (0x80 | SEQ_S2(ofst));
-*/
         /* fixrc(z80, fp); */
-	    HL = 0x00;
-            B = H; A = L;
 	} else {
 	    HL = 0x1;	/* ff => pip error */
-            B = H; A = L;
 	}    
+        B = H; A = L;
 	break;
     case 21:	/* write sequential */
 	fp = getfp(z80, DE);
@@ -865,11 +856,10 @@ void check_BDOS_hook(z80info *z80) {
 	    z80->mem[DE + FCB_EX] = (ofst >> 7) & 0x1f;
 	    z80->mem[DE + FCB_S2] = (ofst >> 12) & 0xff;
 	    HL = 0x00;
-            B = H; A = L;
 	} else {
 	    HL = 0x1;	/* ff => pip error */
-	    B = H; A = L;
 	}
+	    B = H; A = L;
 	}
 	break;
     case 34:	/* write random record */
