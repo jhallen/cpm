@@ -10,12 +10,7 @@
 #include <string.h>
 #include "defs.h"
 
-int nobdos;
-int strace;
-int bdos_return = -1;
-
 /* All the following macros assume access to a parameter named "z80" */
-
 
 /* entry in "REGPAIRXY[]" to get to the IX or IY registers */
 #define XYPAIR 2
@@ -962,44 +957,11 @@ contsw:
 		break;
 	}					/* end of main "switch" */
 
-
 	/** Notify the interceptor if any */
 	if (z80->intercept)
 	    z80->intercept(z80->intercept_ctx, z80);
 
-	/* Trace system calls */
-	if (strace && PC == BDOS_HOOK)
-	{
-	        printf("\r\nbdos call %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
-		for (i = 0; i < 8; ++i)
-		    printf(" %4x", z80->mem[SP + 2*i]
-			   + 256 * z80->mem[SP + 2*i + 1]);
-		printf(")\r\n");
-		bdos_return = SP + 2;
-		if (bdos_fcb(C))
-			bdos_fcb_dump(z80);
-	}
-
-	if (SP == bdos_return)
-	{
-	        printf("\r\nbdos return %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
-		for (i = 0; i < 8; ++i)
-		    printf(" %4x", z80->mem[SP + 2*i]
-			   + 256 * z80->mem[SP + 2*i + 1]);
-		printf(")\r\n");
-		bdos_return = -1;
-		if (bdos_fcb(C))
-			bdos_fcb_dump(z80);
-	}
-
-	if (!nobdos && PC == BDOS_HOOK)
-	{
-		check_BDOS_hook(z80);
-	}
-
 	goto infloop;
-
-
 
 	/* bit-twiddling instructions */
 bitinstr:

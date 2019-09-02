@@ -46,6 +46,9 @@
 
 extern int errno;
 
+int nobdos;
+int strace;
+int bdos_return = -1;
 
 /* globally visible vars */
 static FILE *logfile = NULL;
@@ -1039,11 +1042,40 @@ interrupt(int s)
 static void
 intercept(void *ctx, struct z80info *z80)
 {
+    int i;
+
     /* Reserved for future use */
     assert(!ctx);
 
+	/* Trace system calls */
+	if (strace && PC == BDOS_HOOK)
+	{
+	        printf("\r\nbdos call %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
+		for (i = 0; i < 8; ++i)
+		    printf(" %4x", z80->mem[SP + 2*i]
+			   + 256 * z80->mem[SP + 2*i + 1]);
+		printf(")\r\n");
+		bdos_return = SP + 2;
+		if (bdos_fcb(C))
+			bdos_fcb_dump(z80);
+	}
 
+	if (SP == bdos_return)
+	{
+	        printf("\r\nbdos return %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
+		for (i = 0; i < 8; ++i)
+		    printf(" %4x", z80->mem[SP + 2*i]
+			   + 256 * z80->mem[SP + 2*i + 1]);
+		printf(")\r\n");
+		bdos_return = -1;
+		if (bdos_fcb(C))
+			bdos_fcb_dump(z80);
+	}
 
+	if (!nobdos && PC == BDOS_HOOK)
+	{
+		check_BDOS_hook(z80);
+	}
 }
 
 /*-----------------------------------------------------------------------*\
