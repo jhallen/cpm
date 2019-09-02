@@ -160,6 +160,10 @@ typedef struct z80info
     FILE *drives[MAXDISCS];
     long drivelen[MAXDISCS];
 
+    /* Private: CPU Interceptor is invoked on each and every loop */
+    void *intercept_ctx;
+    void (*intercept)(void *, struct z80info *);
+
     /* 64k bytes - may be allocated separately if desired */
     byte mem[0x10000L];
 
@@ -257,8 +261,10 @@ typedef struct z80info
 
 /* z80.c */
 extern z80info *z80_new(void);
-extern void z80_destroy(z80info *z80);
+extern void set_interceptor(z80info *z80, void *intercept_ctx,
+        void (*intercept)(void *, struct z80info *));
 extern boolean z80_run(z80info *z80, int count);
+extern void z80_destroy(z80info *z80);
 
 extern int nobdos;
 

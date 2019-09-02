@@ -962,6 +962,13 @@ contsw:
 		break;
 	}					/* end of main "switch" */
 
+
+	/** Notify the interceptor if any */
+/*
+	if (z80->intercept)
+	    z80->intercept(NULL, z80);
+*/
+
 	/* Trace system calls */
 	if (strace && PC == BDOS_HOOK)
 	{
@@ -1956,7 +1963,7 @@ iregbitinstr:
 
 
 /* initialize the z80 struct with sane stuff */
-z80info *
+static z80info *
 init_z80info(z80info *z80)
 {
 	int i;
@@ -2049,6 +2056,14 @@ z80_new(void)
 	}
 
 	return init_z80info(z80);
+}
+
+void
+set_interceptor(z80info *z80, void *intercept_ctx,
+        void (*intercept)(void *, struct z80info *))
+{
+    z80->intercept_ctx = intercept_ctx;
+    z80->intercept = intercept;
 }
 
 void
