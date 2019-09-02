@@ -964,10 +964,8 @@ contsw:
 
 
 	/** Notify the interceptor if any */
-/*
 	if (z80->intercept)
-	    z80->intercept(NULL, z80);
-*/
+	    z80->intercept(z80->intercept_ctx, z80);
 
 	/* Trace system calls */
 	if (strace && PC == BDOS_HOOK)
@@ -2059,7 +2057,7 @@ z80_new(void)
 }
 
 void
-set_interceptor(z80info *z80, void *intercept_ctx,
+z80_set_interceptor(z80info *z80, void *intercept_ctx,
         void (*intercept)(void *, struct z80info *))
 {
     z80->intercept_ctx = intercept_ctx;

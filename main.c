@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "defs.h"
 #include "vt.h"
@@ -1035,6 +1036,15 @@ interrupt(int s)
 	signal(s, interrupt);
 }
 
+static void
+intercept(void *ctx, struct z80info *z80)
+{
+    /* Reserved for future use */
+    assert(!ctx);
+
+
+
+}
 
 /*-----------------------------------------------------------------------*\
  |  main  --  set up the global vars & run the z80
@@ -1095,6 +1105,8 @@ main(int argc, const char *argv[])
 
 	if (z80 == NULL)
 		return -1;
+
+    z80_set_interceptor(z80, NULL, intercept);
 
 	initterm();
 

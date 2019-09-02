@@ -261,7 +261,7 @@ typedef struct z80info
 
 /* z80.c */
 extern z80info *z80_new(void);
-extern void set_interceptor(z80info *z80, void *intercept_ctx,
+extern void z80_set_interceptor(z80info *z80, void *intercept_ctx,
         void (*intercept)(void *, struct z80info *));
 extern boolean z80_run(z80info *z80, int count);
 extern void z80_destroy(z80info *z80);
