@@ -256,12 +256,9 @@ typedef struct z80info
 /* function externs: */
 
 /* z80.c */
-extern z80info *new_z80info(void);
-extern z80info *init_z80info(z80info *z80);
-extern z80info *destroy_z80info(z80info *z80);
-extern void delete_z80info(z80info *z80);
-
-extern boolean z80_emulator(z80info *z80, int count);
+extern z80info *z80_new(void);
+extern void z80_destroy(z80info *z80);
+extern boolean z80_run(z80info *z80, int count);
 
 extern int nobdos;
 

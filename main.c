@@ -1091,7 +1091,7 @@ main(int argc, const char *argv[])
 		stuff_cmd = cmd;
 	}
 
-	z80 = new_z80info();
+	z80 = z80_new();
 
 	if (z80 == NULL)
 		return -1;
@@ -1122,6 +1122,6 @@ main(int argc, const char *argv[])
 		EventRecord ev;
 		WaitNextEvent(0, &ev, 0, nil);
 #endif
-		z80_emulator(z80, 100000);
+		z80_run(z80, 100000);
 	}
 }

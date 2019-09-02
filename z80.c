@@ -178,7 +178,7 @@ static boolean parity_inited = FALSE;
 \*-----------------------------------------------------------------------*/
 
 boolean
-z80_emulator(z80info *z80, int count)
+z80_run(z80info *z80, int count)
 {
 	byte t = 0, t1, t2, cy, v, *r = NULL;
 	word tt, tt2, hh, vv, *rr;
@@ -2038,17 +2038,9 @@ init_z80info(z80info *z80)
 }
 
 z80info *
-destroy_z80info(z80info *z80)
+z80_new(void)
 {
-	/* free the mem array if allocated above */
-	/* free(z80->mem); */
-	return z80;
-}
-
-z80info *
-new_z80info(void)
-{
-	z80info *z80 = (z80info*)malloc(sizeof *z80);
+	z80info *z80 = malloc(sizeof *z80);
 
 	if (z80 == NULL)
 	{
@@ -2060,11 +2052,7 @@ new_z80info(void)
 }
 
 void
-delete_z80info(z80info *z80)
+z80_destroy(z80info *z80)
 {
-	if (z80 == NULL)
-		return;
-
-	destroy_z80info(z80);
 	free(z80);
 }
