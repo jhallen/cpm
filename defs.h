@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 /* the current version of the z80 emulator */
-#define VERSION "3.1"
+#define VERSION "3.1e"
 
 
 /* system definitions */
@@ -125,7 +125,7 @@ typedef unsigned long longword;
 /* max number of the BIOS drive tables */
 #define MAXDISCS	16
 
-
+/* TODO: Move the states irrelevant to the CPU to the respective classes */
 typedef struct z80info
 {
     boolean event;
@@ -257,17 +257,17 @@ typedef struct z80info
 #define EVENT	z80->event
 
 
+/* TODO: Create individual header files for newly introduced classes */
 /* function externs: */
 
-/* z80.c */
+/* z80.c class */
 extern z80info *z80_new(void);
 extern void z80_set_interceptor(z80info *z80, void *intercept_ctx,
         void (*intercept)(void *, struct z80info *));
 extern boolean z80_run(z80info *z80, int count);
 extern void z80_destroy(z80info *z80);
 
-extern int nobdos;
-
+/* TODO: Turn into a class */
 /* main.c */
 extern void resetterm(void);
 extern void setterm(void);
@@ -279,26 +279,30 @@ extern word write_mem(z80info *z80, word addr, byte val);
 extern void undefinstr(z80info *z80, byte instr);
 extern boolean loadfile(z80info *z80, const char *fname);
 
+/* TODO: Turn into a class */
 /* bios.c */
 extern void bios(z80info *z80, unsigned int fn);
 extern void sysreset(z80info *z80);
 extern void warmboot(z80info *z80);
 extern void finish(z80info *z80);
+extern int silent_exit;
 
 /* disassem.c */
 extern int disassemlen(void);
 extern int disassem(z80info *z80, word start, FILE *fp);
 
-/* bdos */
+/* bdos class */
+typedef struct bdos_s bdos;
+
 #define BDOS_HOOK 0xDC06
-void check_BDOS_hook(z80info *z80);
-extern int silent_exit;
-extern char *stuff_cmd;
-extern int exec;
-extern int trace_bdos;
-extern int strace;
+bdos *bdos_new();
+void bdos_set_cmd(bdos *obj, char *cmd);
+void bdos_set_exec(bdos *obj, int exec);
+void bdos_set_trace_bdos(bdos *obj, int trace_bdos);
+void bdos_check_hook(bdos *obj, z80info *z80);
 char *bdos_decode(int n);
 int bdos_fcb(int n);
 void bdos_fcb_dump(z80info *z80);
+void bdos_destroy(bdos *obj);
 
 #endif /* __DEFS_H_ */

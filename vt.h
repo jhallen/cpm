@@ -1,3 +1,5 @@
+#ifndef __VT_H_
+#define __VT_H_
 
 /* Return true if input character available */
 int constat();
@@ -11,3 +13,4 @@ int kget(int w);
 /* Write character to terminal */
 void vt52(int c);
 
+#endif /* __DEFS_H_ */

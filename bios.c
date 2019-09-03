@@ -92,6 +92,7 @@
 #define USER		0x000A
 #define USERSTART	0x0100
 
+int silent_exit = 0;
 
 /* forward declarations: */
 static void seldisc(z80info *z80);

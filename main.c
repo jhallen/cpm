@@ -1039,13 +1039,17 @@ interrupt(int s)
 	signal(s, interrupt);
 }
 
+/*-----------------------------------------------------------------------*\
+ |  intercept  --  intercept a CPU loop
+\*-----------------------------------------------------------------------*/
+
 static void
 intercept(void *ctx, struct z80info *z80)
 {
     int i;
+    bdos *bd;
 
-    /* Reserved for future use */
-    assert(!ctx);
+    bd = (bdos *)ctx;
 
 	/* Trace system calls */
 	if (strace && PC == BDOS_HOOK)
@@ -1074,8 +1078,29 @@ intercept(void *ctx, struct z80info *z80)
 
 	if (!nobdos && PC == BDOS_HOOK)
 	{
-		check_BDOS_hook(z80);
+		bdos_check_hook(bd, z80);
 	}
+}
+
+/*-----------------------------------------------------------------------*\
+ |  setsigs  --  set up the signal handling
+\*-----------------------------------------------------------------------*/
+
+static void
+setsigs()
+{
+#ifdef SIGQUIT
+	signal(SIGQUIT, quit);
+#endif
+#ifdef SIGHUP
+	signal(SIGHUP, quit);
+#endif
+#ifdef SIGTERM
+	signal(SIGTERM, quit);
+#endif
+#ifdef SIGINT
+	signal(SIGINT, interrupt);
+#endif
 }
 
 /*-----------------------------------------------------------------------*\
@@ -1088,19 +1113,22 @@ main(int argc, const char *argv[])
 	int x;
 	char cmd[256];
 	int help = 0;
+	bdos *bd;
 
 	cmd[0] = 0;
+
+	bd = bdos_new();
 
 	for (x = 1; x < argc; ++x) {
 		if (argv[x][0] == '-' && argv[x][1] == '-') {
 			if (!strcmp(argv[x], "--help")) {
 				help = 1;
 			} else if (!strcmp(argv[x], "--exec")) {
-				exec = 1;
+				bdos_set_exec(bd, 1);
 			} else if (!strcmp(argv[x], "--nobdos")) {
 				nobdos = 1;
 			} else if (!strcmp(argv[x], "--trace_bdos")) {
-				trace_bdos = 1;
+				bdos_set_trace_bdos(bd, 1);
 			} else if (!strcmp(argv[x], "--strace")) {
 				strace = 1;
 			} else {
@@ -1129,35 +1157,22 @@ main(int argc, const char *argv[])
 		exit(0);
 	}
 
-	if (cmd[0]) {
-		stuff_cmd = cmd;
-	}
+	if (cmd[0])
+		bdos_set_cmd(bd, cmd);
 
 	z80 = z80_new();
-
-	if (z80 == NULL)
-		return -1;
-
-    z80_set_interceptor(z80, NULL, intercept);
+    z80_set_interceptor(z80, bd, intercept);
+    if (!z80) {
+	z80_destroy(z80);
+	bdos_destroy(bd);
+	return -1;
+    }
 
 	initterm();
 
 	/* set up the signals */
-#ifdef SIGQUIT
-	signal(SIGQUIT, quit);
-#endif
-#ifdef SIGHUP
-	signal(SIGHUP, quit);
-#endif
-#ifdef SIGTERM
-	signal(SIGTERM, quit);
-#endif
-#ifdef SIGINT
-	signal(SIGINT, interrupt);
-#endif
-
+	setsigs();
 	setterm();
-
 	sysreset(z80);
 
 	while (1)
@@ -1168,4 +1183,8 @@ main(int argc, const char *argv[])
 #endif
 		z80_run(z80, 100000);
 	}
+
+	z80_destroy(z80);
+	bdos_destroy(bd);
+	return 0;
 }
