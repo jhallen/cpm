@@ -629,7 +629,13 @@ void check_BDOS_hook(z80info *z80) {
     case 16:	/* close file */
         {
             long host_size, host_exts;
-	    fp = getfp(z80, DE);
+
+	    if (!(fp = lookfp(z80, DE))) {
+		/* if the FBC is unknown, return an error */
+		HL = 0xFF;
+		B = H, A = L;
+		break;
+	    }
             fseek(fp, 0, SEEK_END);
             host_size = ftell(fp);
             host_exts = SEQ_EXTENT(host_size);
