@@ -179,6 +179,8 @@ z80_run(z80info *z80, int count)
 	word tt, tt2, hh, vv, *rr;
 	longword ttt;
 	int i, j, h, n, s;
+	z80info *obj;
+	obj = z80;
 
 	/* main loop  --  all "goto"s eventually end up here */
 infloop:
@@ -194,7 +196,7 @@ infloop:
 
 		/* HALT execution if desired - this is for tracing & such */
 		if (HALT)
-			haltcpu(z80);
+			vm_haltcpu(z80->vm, z80);
 
 		/* "i" is used to see if we need to get the next opcode or not*/
 		i = TRUE;
@@ -667,11 +669,11 @@ contsw:
 	case 0x27:					/* daa */
 		i = 0;
 		t = 0x00;
-		if (F & CARRY || A > 0x99) {
+		if ((F & CARRY) || A > 0x99) {
 			t |= 0x60;
 			i = 1;
 		}
-		if (F & HALF || (A & MASK4) > 9)
+		if ((F & HALF) || (A & MASK4) > 9)
 			t |= 0x06;
 		arith8(t, 0, F & NEGATIVE);
 		setflag(CARRY, i);
@@ -940,20 +942,20 @@ contsw:
 	/* input & output group */
 
 	case 0xDB:					/* in a,n */
-		if (!input(z80, A, MEM(PC), &t1))
+		if (!vm_input(z80->vm, z80, A, MEM(PC), &t1))
 			return FALSE;
 
 		A = t1;
 		PC++;
 		break;
 	case 0xD3:					/* out a,n */
-		output(z80, A, MEM(PC), A);
+		vm_output(z80->vm, z80, A, MEM(PC), A);
 		PC++;
 		break;
 
 
 	default: 
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}					/* end of main "switch" */
 
@@ -1321,7 +1323,7 @@ bitinstr:
 		break;
 
 	default: 
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "bitinstr" "switch" */
 
@@ -1516,7 +1518,7 @@ ireginstr:
 
 
 	default:
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "ireginstr" "switch" */
 
@@ -1736,7 +1738,7 @@ extinstr:
 	case 0x68:					/* in l,c */
 	case 0x70:					/* in ?,c */
 	case 0x78:					/* in a,c */
-		if (!input(z80, B, C, &t1))
+		if (!vm_input(z80->vm, z80, B, C, &t1))
 			return FALSE;
 
 		v = *REG[(t >> 3) & MASK3] = t1;
@@ -1754,14 +1756,14 @@ extinstr:
 	case 0x69:					/* out l,c */
 	case 0x79:					/* out a,c */
 	case 0x41:					/* out b,c */
-		output(z80, B, C, *REG[(t >> 3) & MASK3]);
+		vm_output(z80->vm, z80, B, C, *REG[(t >> 3) & MASK3]);
 		break;
 
 	case 0xA2:					/* ini */
 	case 0xAA:					/* ind */
 	case 0xB2:					/* inir */
 	case 0xBA:					/* indr */
-		if (!input(z80, B, C, &t1))
+		if (!vm_input(z80->vm, z80, B, C, &t1))
 			return FALSE;
 
 		SETMEM(HL, t1);
@@ -1784,7 +1786,7 @@ extinstr:
 	case 0xB3:					/* otir */
 	case 0xBB:					/* otdr */
 		resetflag(ZERO, --B);
-		output(z80, B, C, MEM(HL));
+		vm_output(z80->vm, z80, B, C, MEM(HL));
 
 		if (t & BIT3)
 			HL--;
@@ -1800,7 +1802,7 @@ extinstr:
 
 
 	default:
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "extinstr" "switch" */
 
@@ -1911,7 +1913,7 @@ iregbitinstr:
 
 
 	default: 
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "iregbitinstr" "switch" */
 
@@ -1924,7 +1926,7 @@ iregbitinstr:
 
 /* initialize the z80 struct with sane stuff */
 static z80info *
-init_z80info(z80info *z80)
+init_z80info(z80info *z80, vm *vm)
 {
 	int i;
 
@@ -1971,17 +1973,13 @@ init_z80info(z80info *z80)
 	REGIR[0] = &I;
 	REGIR[1] = &R;
 
-	/* initialize the other misc stuff */
-	z80->trace = FALSE;
-	z80->step = FALSE;
-	z80->sig = 0;
-	z80->syscall = FALSE;
-
 	/* initialize the CP/M BIOS data */
 	z80->drive = 0;
 	z80->dma = 0x80;
 	z80->track = 0;
 	z80->sector = 1;
+
+	z80->vm = vm;
 
 	/* initialize the global parity array if necessary */
 	if (!parity_inited)
@@ -2005,7 +2003,7 @@ init_z80info(z80info *z80)
 }
 
 z80info *
-z80_new(void)
+z80_new(vm * vm)
 {
 	z80info *z80 = malloc(sizeof *z80);
 
@@ -2015,7 +2013,7 @@ z80_new(void)
 		return NULL;
 	}
 
-	return init_z80info(z80);
+	return init_z80info(z80, vm);
 }
 
 void

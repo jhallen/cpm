@@ -92,10 +92,31 @@
 #define USER		0x000A
 #define USERSTART	0x0100
 
-int silent_exit = 0;
+struct bios_s {
+	vm *vm;
+    int silent_exit;
+};
+
+bios *bios_new(vm *vm)
+{
+	bios *obj;
+	obj = calloc(1, sizeof(bios));
+	obj->vm = vm;
+    return obj;
+}
+
+void bios_destroy(bios *obj)
+{
+	free(obj);
+}
+
+void bios_set_silent_exit(bios *obj, int silent_exit)
+{
+	obj->silent_exit = silent_exit;
+}
 
 /* forward declarations: */
-static void seldisc(z80info *z80);
+static void seldisc(bios *obj, z80info *z80);
 
 
 static void
@@ -114,14 +135,14 @@ closeall(z80info *z80)
 }
 
 void
-warmboot(z80info *z80)
+bios_warmboot(bios *obj, z80info *z80)
 {
 	unsigned int i;
 
 	closeall(z80);
 
-	if (silent_exit) {
-		finish(z80);
+	if (obj->silent_exit) {
+		bios_finish(obj, z80);
 	}
 
 	/* load CCP and BDOS into memory (max 0x1600 in size) */
@@ -129,8 +150,8 @@ warmboot(z80info *z80)
 		SETMEM(CCP + i, cpm_array[i]);
 
 	/* try to load CCP/BDOS from disk, but ignore any errors */
-	loadfile(z80, "bdos.hex");
-	loadfile(z80, "ccp.hex");
+	vm_loadfile(z80, "bdos.hex");
+	vm_loadfile(z80, "ccp.hex");
 
 	/* CP/M system reset via "JP 00" - entry into BIOS warm-boot */
 	SETMEM(0x0000, 0xC3);		/* JP CBIOS+3 */
@@ -275,34 +296,36 @@ warmboot(z80info *z80)
 	/* make sure the current file/disk is open */
 	B = 0;
 	C = z80->drive;
-	seldisc(z80);
+	seldisc(obj, z80);
 
 	PC = CCP;
 }
 
 static void
-boot(z80info *z80)
+boot(bios *obj, z80info *z80)
 {
 	z80->drive = 0;
-	warmboot(z80);
+	bios_warmboot(obj, z80);
 }
 
 void
-sysreset(z80info *z80)
+bios_sysreset(bios *obj, z80info *z80)
 {
-	boot(z80);
+	boot(obj, z80);
 }
 
 static void
-consstat(z80info *z80)
+consstat(bios *obj, z80info *z80)
 {
-	input(z80, 0x01, 0x01, &A);
+    (void)obj;
+	vm_input(obj->vm, z80, 0x01, 0x01, &A);
 }
 
 static void
-consin(z80info *z80)
+consin(bios *obj, z80info *z80)
 {
-	input(z80, 0x00, 0x00, &A);
+    (void)obj;
+	vm_input(obj->vm, z80, 0x00, 0x00, &A);
 
 /* What is this for? It messing up Ctrl-S...
 	if (A == CNTL('S'))
@@ -311,16 +334,18 @@ consin(z80info *z80)
 }
 
 static void
-consout(z80info *z80)
+consout(bios *obj, z80info *z80)
 {
-	output(z80, 0x00, 0x00, C & 0x7F);
+    (void)obj;
+	vm_output(obj->vm, z80, 0x00, 0x00, C & 0x7F);
 }
 
 /* list character in C */
 static void
-list(z80info *z80)
+list(bios *obj, z80info *z80)
 {
 	static FILE *fp = NULL;
+    (void)obj;
 
 	if (fp == NULL)
 	{
@@ -343,22 +368,25 @@ list(z80info *z80)
 
 /* punch character in C */
 static void
-punch(z80info *z80)
+punch(bios *obj, z80info *z80)
 {
+    (void)obj;
 	(void)z80;
 }
 
 /* return reader char in A, ^Z is EOF */
 static void
-reader(z80info *z80)
+reader(bios *obj, z80info *z80)
 {
+    (void)obj;
 	(void)z80;
 	A = CNTL('Z');
 }
 
 static void
-home(z80info *z80)
+home(bios *obj, z80info *z80)
 {
+    (void)obj;
 	z80->track = 0;
 	z80->sector = 1;
 }
@@ -366,11 +394,12 @@ home(z80info *z80)
 /* Open disk image */
 
 static void
-realizedisk(z80info *z80)
+realizedisk(bios *obj, z80info *z80)
 {
 	int drive = z80->drive;
 	char drivestr[80];
 
+    (void)obj;
 	strcpy(drivestr, drive < NUMHDISCS ? "A-Hdrive" : "A-drive");
 	drivestr[0] += drive; /* set the 1st letter to the drive name */
 
@@ -427,7 +456,7 @@ realizedisk(z80info *z80)
 }
 
 static void
-seldisc(z80info *z80)
+seldisc(bios *obj, z80info *z80)
 {
 	H = 0;
 	L = 0;
@@ -452,15 +481,16 @@ seldisc(z80info *z80)
 	    H = (DPBASE + DPHSIZE * C) >> 8;
 	}
 
-	home(z80);
+	home(obj, z80);
 }
 
 static void
-settrack(z80info *z80)
+settrack(bios *obj, z80info *z80)
 {
 	int tracks = (z80->drive < NUMHDISCS) ?
 			HDTRACKSPERDISC : TRACKSPERDISC;
 
+    (void)obj;
 	z80->track = (B << 8) + C;
 
 	if (z80->track < RESERVEDTRACKS || z80->track >= tracks)
@@ -469,10 +499,11 @@ settrack(z80info *z80)
 }
 
 static void
-setsector(z80info *z80)
+setsector(bios *obj, z80info *z80)
 {
 	int sectors = (z80->drive < NUMHDISCS) ?
 			HDSECTORSPERTRACK : SECTORSPERTRACK;
+    (void)obj;
 
 	z80->sector = (B << 8) + C;
 
@@ -482,14 +513,15 @@ setsector(z80info *z80)
 }
 
 static void
-setdma(z80info *z80)
+setdma(bios *obj, z80info *z80)
 {
+    (void)obj;
 	z80->dma = (B << 8) + C;
 }
 
 
 static void
-rdsector(z80info *z80)
+rdsector(bios *obj, z80info *z80)
 {
 	int n;
 	int drive = z80->drive;
@@ -498,7 +530,8 @@ rdsector(z80info *z80)
 			sectors * ((long)z80->track - TRACKOFFSET));
 	FILE *fp;
 	long len;
-	realizedisk(z80);
+    (void)obj;
+	realizedisk(obj, z80);
 	fp = z80->drives[drive];
 	len = z80->drivelen[drive];
 
@@ -538,7 +571,7 @@ rdsector(z80info *z80)
 
 
 static void
-wrsector(z80info *z80)
+wrsector(bios *obj, z80info *z80)
 {
 	int drive = z80->drive;
 	int sectors = (drive < NUMHDISCS) ? HDSECTORSPERTRACK : SECTORSPERTRACK;
@@ -546,7 +579,7 @@ wrsector(z80info *z80)
 			sectors * ((long)z80->track - TRACKOFFSET));
 	FILE *fp;
 	long len;
-	realizedisk(z80);
+	realizedisk(obj, z80);
 	fp = z80->drives[drive];
 	len = z80->drivelen[drive];
 
@@ -609,8 +642,9 @@ wrsector(z80info *z80)
 }
 
 static void
-secttran(z80info *z80)
+secttran(bios *obj, z80info *z80)
 {
+    (void)obj;
 	if (z80->drive < NUMHDISCS)
 	{
 		/* simple sector translation for hard disc */
@@ -630,8 +664,9 @@ secttran(z80info *z80)
 }
 
 static void
-liststat(z80info *z80)
+liststat(bios *obj, z80info *z80)
 {
+    (void)obj;
 	A = 0xFF;
 }
 
@@ -702,7 +737,7 @@ int cpm_file_free(int x)
    The algorithm uses the FCB to store info about the UNIX file.
  */
 static void
-openunix(z80info *z80)
+openunix(bios *obj, z80info *z80)
 {
 	char filename[20], *fp;
 	byte *cp;
@@ -710,6 +745,7 @@ openunix(z80info *z80)
 	FILE *fd;
 	int fd_no;
 
+    (void)obj;
 	cp = &(z80->mem[DE + 1]);
 	fp = filename;
 
@@ -749,7 +785,7 @@ openunix(z80info *z80)
    The algorithm uses the FCB to store info about the UNIX file.
  */
 static void
-createunix(z80info *z80)
+createunix(bios *obj, z80info *z80)
 {
 	char filename[20], *fp;
 	byte *cp;
@@ -757,6 +793,7 @@ createunix(z80info *z80)
 	FILE *fd;
 	int fd_no;
 
+    (void)obj;
 	cp = &(z80->mem[DE + 1]);
 	fp = filename;
 
@@ -794,13 +831,14 @@ createunix(z80info *z80)
    The algorithm uses the FCB to store info about the UNIX file.
  */
 static void
-rdunix(z80info *z80)
+rdunix(bios *obj, z80info *z80)
 {
 	byte *cp;
 	int i, blk, size;
 	FILE *fd;
 	int fd_no;
   
+    (void)obj;
 	cp = &(z80->mem[z80->dma]);
 	fd = cpm_file_get((fd_no = addr2int(&z80->mem[DE + FDOFFSET])));
 	blk = addr2int(&z80->mem[DE + BLKOFFSET]);
@@ -837,13 +875,14 @@ rdunix(z80info *z80)
    The algorithm uses the FCB to store info about the UNIX file.
  */
 static void
-wrunix(z80info *z80)
+wrunix(bios *obj, z80info *z80)
 {
 	byte *cp;
 	int i, blk, size;
 	FILE *fd;
 	int fd_no;
 
+    (void)obj;
 	cp = &(z80->mem[z80->dma]);
 	fd = cpm_file_get((fd_no = addr2int(&z80->mem[DE + FDOFFSET])));
 	blk = addr2int(&z80->mem[DE + BLKOFFSET]);
@@ -872,10 +911,11 @@ wrunix(z80info *z80)
    On return, A contains 0 if all went well, 0xFF otherwise.
  */
 static void
-closeunix(z80info *z80)
+closeunix(bios *obj, z80info *z80)
 {
 	int fd_no;
 
+    (void)obj;
 	fd_no = addr2int(&z80->mem[DE + FDOFFSET]);
 	A = 0xFF;
 
@@ -887,10 +927,15 @@ closeunix(z80info *z80)
 
 /* clean up and quit - never returns */
 void
-finish(z80info *z80)
+bios_finish(bios *obj, z80info *z80)
 {
 	(void)z80;
-	resetterm();
+	vm_resetterm(obj->vm);
+
+	/* TODO: Provide a more graceful shutdown across all the layers */
+	z80_destroy(z80);
+	vm_destroy(obj->vm);
+
 	exit(0);
 }
 
@@ -904,7 +949,7 @@ finish(z80info *z80)
 	HL+4:SECONDS (BCD)
  */
 static void
-dotime(z80info *z80)
+dotime(bios *obj, z80info *z80)
 {
     time_t now;
     struct tm *t;
@@ -934,12 +979,12 @@ dotime(z80info *z80)
 }
 
 void
-bios(z80info *z80, unsigned int fn)
+bios_call(bios *obj, z80info *z80, unsigned int fn)
 {
-	static void (*bioscall[])(z80info *z80) =
+	static void (*bioscall[])(bios *, z80info *) =
 	{
 		boot,		/* 0 */
-		warmboot,	/* 1 */
+		bios_warmboot,	/* 1 */
 		consstat,	/* 2 */
 		consin,		/* 3 */
 		consout,	/* 4 */
@@ -960,7 +1005,7 @@ bios(z80info *z80, unsigned int fn)
 		rdunix,		/* 19 */
 		wrunix,		/* 20 */
 		closeunix,	/* 21 */
-		finish,		/* 22 */
+		bios_finish,		/* 22 */
 		dotime		/* 23 */
 	};
 
@@ -970,6 +1015,6 @@ bios(z80info *z80, unsigned int fn)
 		return;
 	}
 
-	bioscall[fn](z80);
+	bioscall[fn](obj, z80);
 	/* let z80 handle return */
 }

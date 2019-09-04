@@ -29,6 +29,8 @@ FCB related numbers
 #define MaxS2 15	/* Maximum value the S2 (modules) field can take - Can be set to 63 to emulate CP/M Plus */
 
 struct bdos_s {
+	vm *vm;
+	bios *bios;
 	char *cmd;
 	int exec;
 	int trace_bdos;
@@ -37,8 +39,12 @@ struct bdos_s {
 	int restricted_mode;
 };
 
-bdos *bdos_new() {
-	return calloc(1, sizeof(bdos));
+bdos *bdos_new(vm *vm, bios *bios)
+{
+	bdos *obj = calloc(1, sizeof(bdos));
+	obj->vm = vm;
+	obj->bios = bios;
+	return obj;
 }
 
 void bdos_set_cmd(bdos *obj, char *cmd)
@@ -87,12 +93,12 @@ static char *rdcmdline(bdos *obj, z80info *z80, int max, int ctrl_c_enable)
 	/* printf("'%s'\n", stuff_cmd); */
 	i = 1 + strlen(s + i);
 	obj->cmd = 0;
-	silent_exit = 1;
+	bios_set_silent_exit(obj->bios, 1);
 	goto hit_rtn;
     } else if (obj->exec) {
         killprompt();
         printf("\r\n");
-        finish(z80);
+        bios_finish(obj->bios, z80);
         return s;
     }
 
@@ -125,8 +131,8 @@ loop:
 	    s[0] = i-1;
 	    s[i] = 0;
 	    if (!strcmp(s + 1, "bye")) {
-	    	printf("\r\n");
-	    	finish(z80);
+		printf("\r\n");
+		bios_finish(obj->bios, z80);
 	    }
 	    if (i <= max)
 		s[i] = '\r';
@@ -207,7 +213,7 @@ static void storefp(bdos *obj, z80info *z80, FILE *fp, unsigned where) {
     if (ind < 0) {
 	if (++obj->storedfps > 100) {
 	    fprintf(stderr, "out of fp stores!\n");
-            resetterm();
+            vm_resetterm(obj->vm);
 	    exit(1);
 	}
 	ind = obj->storedfps - 1;
@@ -248,7 +254,7 @@ static void fcberr(bdos *obj, z80info *z80, unsigned where) {
     for (i = 0; i < obj->storedfps; ++i)
 	if (stfps[i].where != 0xffffU)
 	    printf("%s %04x\n", stfps[i].name, stfps[i].where);
-    resetterm();
+    vm_resetterm(obj->vm);
     exit(1);
 }
 
@@ -474,6 +480,8 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
     char *s, *t;
     const char *mode;
     long fpos;
+    unsigned long len;
+
     if (obj->trace_bdos)
     {
         printf("\r\nbdos %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
@@ -484,7 +492,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
     }
     switch (C) {
     case  0:    /* System Reset */
-	warmboot(z80);
+	bios_warmboot(obj->bios, z80);
 	return;
 #if 0
 	for (i = 0; i < 0x1600; ++i)
@@ -510,7 +518,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 		if (A == 3) {	/* ctrl-C pressed */
 		    /* PC = BIOS+3;
 		       check_BIOS_hook(); */
-		    warmboot(z80);
+		    bios_warmboot(obj->bios, z80);
 		    return;
 		}
 	    }
@@ -555,7 +563,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	s = rdcmdline(obj, z80, *(unsigned char *)(t = (char *)(z80->mem + DE)), 1);
 	if (PC == BIOS+3) { 	/* ctrl-C pressed */
 	    /* check_BIOS_hook(); */		/* execute WBOOT */
-	    warmboot(z80);
+	    bios_warmboot(obj->bios, z80);
 	    return;
 	}
 	++t;
@@ -663,7 +671,6 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	z80->mem[DE + FCB_S2] = 0;
 	/* z80->mem[DE + FCB_S2] |= 0x80; */
 
-    unsigned long len;
     len = filesize(fp) / 128;
 
 	z80->mem[DE + FCB_RC] = len;	/* rc field of FCB */
@@ -716,7 +723,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	    closedir(dp);
 	if (!(dp = opendir("."))) {
 	    fprintf(stderr, "opendir fails\n");
-            resetterm();
+            vm_resetterm(obj->vm);
 	    exit(1);
 	}
 	sfn = DE;
@@ -932,7 +939,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	    printf(" %4x", z80->mem[SP + 2*i]
 		   + 256 * z80->mem[SP + 2*i + 1]);
 	printf("\r\n");
-	resetterm();
+	vm_resetterm(obj->vm);
 	exit(1);
     }
     z80->mem[PC = DIRBUF-1] = 0xc9; /* Return instruction */
