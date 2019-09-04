@@ -18,6 +18,7 @@
 #include <assert.h>
 
 #include "defs.h"
+#include "bdos.h"
 #include "vt.h"
 
 #if defined macintosh

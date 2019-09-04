@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "defs.h"
+#include "bdos.h"
 #include "vt.h"
 
 #define BIOS 0xFE00
