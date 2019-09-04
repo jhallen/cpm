@@ -38,6 +38,8 @@ struct bdos_s {
 	int storedfps;
 	unsigned short usercode;
 	int restricted_mode;
+    DIR *dp;
+    unsigned sfn;
 };
 
 bdos *bdos_new(vm *vm, bios *bios)
@@ -332,9 +334,6 @@ static void delfp(bdos *obj, z80info *z80, unsigned where) {
 /* Convert offset to high byte of extent number */
 #define SEQ_S2(n) (SEQ_EXTENT(n) / 32)
 
-static DIR *dp = NULL;
-static unsigned sfn = 0;
-
 char *bdos_decode(int n)
 {
 	switch (n) {
@@ -606,20 +605,20 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	/* storedfps = 0; */	/* WS crashes then */
 	HL = 0;
         B = H; A = L;
-	if (dp)
-	    closedir(dp);
+	if (obj->dp)
+	    closedir(obj->dp);
 	{   struct dirent *de;
-            if ((dp = opendir("."))) {
-                while ((de = readdir(dp))) {
+            if ((obj->dp = opendir("."))) {
+                while ((de = readdir(obj->dp))) {
                     if (strchr(de->d_name, '$')) {
                         A = 0xff;
                         break;
                     }
                 }
-                closedir(dp);
+                closedir(obj->dp);
             }
         }
-	dp = NULL;
+	obj->dp = NULL;
 	z80->dma = 0x80;
 	/* select only A:, all r/w */
 	break;
@@ -720,25 +719,25 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
         }
 	break;
     case 17:	/* search for first */
-	if (dp)
-	    closedir(dp);
-	if (!(dp = opendir("."))) {
+	if (obj->dp)
+	    closedir(obj->dp);
+	if (!(obj->dp = opendir("."))) {
 	    fprintf(stderr, "opendir fails\n");
             vm_resetterm(obj->vm);
 	    exit(1);
 	}
-	sfn = DE;
+	obj->sfn = DE;
 	/* fall through */
     case 18:	/* search for next */
-	if (!dp)
+	if (!obj->dp)
 	    goto retbad;
 	{   struct dirent *de;
 	    unsigned char *p;
 	    const char *sr;
 	nocpmname:
-	    if (!(de = readdir(dp))) {
-		closedir(dp);
-		dp = NULL;
+	    if (!(de = readdir(obj->dp))) {
+		closedir(obj->dp);
+		obj->dp = NULL;
 	    retbad:
 	        HL = 0xff;
                 B = H; A = L;
@@ -774,7 +773,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	    /* OK, fcb block is filled */
 	    /* match name */
 	    p -= 11;
-	    sr = (char *)(z80->mem + sfn);
+	    sr = (char *)(z80->mem + obj->sfn);
 	    for (i = 1; i <= 12; ++i)
 		if (sr[i] != '?' && sr[i] != p[i])
 		    goto nocpmname;
