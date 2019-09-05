@@ -1974,12 +1974,6 @@ init_z80info(z80info *z80, vm *vm)
 	REGIR[0] = &I;
 	REGIR[1] = &R;
 
-	/* initialize the CP/M BIOS data */
-	z80->drive = 0;
-	z80->dma = 0x80;
-	z80->track = 0;
-	z80->sector = 1;
-
 	z80->vm = vm;
 
 	/* initialize the global parity array if necessary */

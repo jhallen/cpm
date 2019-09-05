@@ -82,15 +82,6 @@ typedef struct z80info
     word *regixy[2];
     byte *regir[2];
 
-    /* TODO: These belong to the BIOS state */
-    /* these are for the CP/M BIOS */
-    int	drive;
-    word dma;
-    word track;
-    word sector;
-    FILE *drives[MAXDISCS];
-    long drivelen[MAXDISCS];
-
     /* Private: CPU Interceptor is invoked on each and every loop */
     void *intercept_ctx;
     void (*intercept)(void *, struct z80info *);

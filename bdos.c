@@ -579,7 +579,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	F = 0;
 	break;
     case 26:    /* Set DMA Address */
-	z80->dma = DE;
+	bios_set_dma(obj->bios, DE);
 	HL = 0;
         B = H; A = L;
 	break;
@@ -620,7 +620,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
             }
         }
 	obj->dp = NULL;
-	z80->dma = 0x80;
+	bios_set_dma(obj->bios, 0x80);
 	/* select only A:, all r/w */
 	break;
     case 14:	/* select disk */
@@ -747,7 +747,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	    }
 	    /* printf("\r\nlooking at %s\r\n", de->d_name); */
 	    /* compare data */
-	    memset(p = z80->mem+z80->dma, 0, 128);	/* dmaaddr instead of DIRBUF!! */
+	    memset(p = z80->mem + bios_get_dma(obj->bios), 0, 128);	/* dmaaddr instead of DIRBUF!! */
 	    if (*de->d_name == '.')
 		goto nocpmname;
 	    if (strchr(sr = de->d_name, '.')) {
@@ -797,10 +797,12 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
         fpos = (z80->mem[DE + FCB_S2] & MaxS2) * BlkS2 * BlkSZ +
          z80->mem[DE + FCB_EX] * BlkEX * BlkSZ +
          z80->mem[DE + FCB_CR] * BlkSZ;
-	if (!fseek(fp, fpos, SEEK_SET) && ((i = fread(z80->mem+z80->dma, 1, 128, fp)) > 0)) {
+	if (!fseek(fp, fpos, SEEK_SET) &&
+			((i = fread(z80->mem + bios_get_dma(obj->bios), 1, 128, fp)) > 0))
+	{
 	    /* long ofst = ftell(fp) + 127; */
 	    if (i != 128)
-		memset(z80->mem+z80->dma+i, 0x1a, 128-i);
+		memset(z80->mem + bios_get_dma(obj->bios) + i, 0x1a, 128-i);
         /* Update FCB fields */
         
         z80->mem[DE + FCB_CR] = z80->mem[DE + FCB_CR] + 1;
@@ -826,7 +828,9 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
     case 21:	/* write sequential */
 	fp = getfp(obj, z80, DE);
     writeseq:
-	if (!fseek(fp, SEQ_ADDRESS, SEEK_SET) && fwrite(z80->mem+z80->dma, 1, 128, fp) == 128) {
+	if (!fseek(fp, SEQ_ADDRESS, SEEK_SET) &&
+			fwrite(z80->mem + bios_get_dma(obj->bios), 1, 128, fp) == 128)
+	{
 	    long ofst = ftell(fp);
 	    z80->mem[DE + FCB_CR] = SEQ_CR(ofst);
 	    z80->mem[DE + FCB_EX] = SEQ_EX(ofst);
@@ -880,9 +884,11 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	ofst = (z80->mem[DE + FCB_R2] << 16) | (z80->mem[DE + FCB_R1] << 8) |
 		z80->mem[DE + FCB_R0];
 	fpos = ofst * BlkSZ;
-	if (!fseek(fp, fpos, SEEK_SET) && ((i = fread(z80->mem+z80->dma, 1, 128, fp)) > 0)) {
+	if (!fseek(fp, fpos, SEEK_SET) &&
+			((i = fread(z80->mem + bios_get_dma(obj->bios), 1, 128, fp)) > 0))
+	{
 	    if (i != 128)
-		memset(z80->mem+z80->dma+i, 0x1a, 128-i);
+		memset(z80->mem + bios_get_dma(obj->bios) + i, 0x1a, 128-i);
 	    /* fixrc(z80, fp); */
 	    z80->mem[DE + FCB_CR] = ofst & 0x7f;
 	    z80->mem[DE + FCB_EX] = (ofst >> 7) & 0x1f;

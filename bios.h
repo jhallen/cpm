@@ -8,6 +8,8 @@
 typedef struct bios_s bios;
 
 bios *bios_new(vm *vm);
+word bios_get_dma(bios *obj);
+void bios_set_dma(bios *obj, word dma);
 void bios_set_silent_exit(bios *obj, int silent_exit);
 void bios_call(bios *obj, z80info *z80, unsigned int fn);
 void bios_sysreset(bios *obj, z80info *z80);
