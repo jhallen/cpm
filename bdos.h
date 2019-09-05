@@ -1,6 +1,9 @@
 #ifndef __BDOS_H_
 #define __BDOS_H_
 
+#include "defs.h"
+#include "bios.h"
+
 /* bdos class */
 
 typedef struct bdos_s bdos;

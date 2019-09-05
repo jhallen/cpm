@@ -10,6 +10,7 @@
 
 #include "defs.h"
 #include "bdos.h"
+#include "vm.h"
 #include "vt.h"
 
 #define BIOS 0xFE00

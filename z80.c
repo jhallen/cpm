@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "defs.h"
+#include "vm.h"
 
 /* All the following macros assume access to a parameter named "z80" */
 

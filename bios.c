@@ -16,8 +16,11 @@
 #include <string.h>
 #include <time.h>
 #include <sys/types.h>
+#include "bios.h"
+#include "vm.h"
 #include "cpmdisc.h"
 #include "defs.h"
+#include "z80.h"
 
 #ifdef macintosh
 #include <stat.h>

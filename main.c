@@ -18,8 +18,11 @@
 #include <assert.h>
 
 #include "defs.h"
+#include "vm.h"
+#include "bios.h"
 #include "bdos.h"
 #include "vt.h"
+#include "disassem.h"
 
 #if defined macintosh
 #	include <Types.h>
