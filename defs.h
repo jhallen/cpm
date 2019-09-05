@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 /* the current version of the z80 emulator */
-#define VERSION "3.1"
+#define VERSION "3.1e"
 
 
 /* system definitions */
@@ -125,7 +125,9 @@ typedef unsigned long longword;
 /* max number of the BIOS drive tables */
 #define MAXDISCS	16
 
+typedef struct vm_s vm;
 
+/* TODO: Move the states irrelevant to the CPU to the respective classes */
 typedef struct z80info
 {
     boolean event;
@@ -145,13 +147,7 @@ typedef struct z80info
     word *regixy[2];
     byte *regir[2];
 
-    /* these are for the I/O, CP/M, and outside needs */
-    boolean trace;		/* trace mode off/on */
-    boolean step;		/* step-trace mode off/on */
-    int sig;		/* caught a signal */
-    int syscall;	/* CP/M syscall to be done */
-    int biosfn;		/* BIOS function be done */
-
+    /* TODO: These belong to the BIOS state */
     /* these are for the CP/M BIOS */
     int	drive;
     word dma;
@@ -159,6 +155,13 @@ typedef struct z80info
     word sector;
     FILE *drives[MAXDISCS];
     long drivelen[MAXDISCS];
+
+    /* Private: CPU Interceptor is invoked on each and every loop */
+    void *intercept_ctx;
+    void (*intercept)(void *, struct z80info *);
+
+    /* Virtual Machine pointer */
+    vm *vm;
 
     /* 64k bytes - may be allocated separately if desired */
     byte mem[0x10000L];
@@ -187,11 +190,11 @@ typedef struct z80info
 #ifdef MEM_BREAK
 #    define MEM(addr)	\
 		(z80->membrk[(word)(addr)] ?	\
-		read_mem(z80, addr) :	\
+		vm_read_mem(obj->vm, z80, addr) :	\
 		z80->mem[(word)(addr)])
 #    define SETMEM(addr, val)	\
 		(z80->membrk[(word)(addr)] ?	\
-		write_mem(z80, addr, val) :	\
+		vm_write_mem(obj->vm, z80, addr, val) :	\
 		(z80->mem[(word)(addr)] = (byte)(val)))
 
 	/* various flags for "membrk" - others may be added */
@@ -253,49 +256,43 @@ typedef struct z80info
 #define EVENT	z80->event
 
 
+/* TODO: Create individual header files for newly introduced classes */
 /* function externs: */
 
-/* z80.c */
-extern z80info *new_z80info(void);
-extern z80info *init_z80info(z80info *z80);
-extern z80info *destroy_z80info(z80info *z80);
-extern void delete_z80info(z80info *z80);
+/* z80.c class */
+z80info *z80_new(vm *vm);
+void z80_set_interceptor(z80info *z80, void *intercept_ctx,
+		void (*intercept)(void *, struct z80info *));
+boolean z80_run(z80info *z80, int count);
+void z80_destroy(z80info *z80);
 
-extern boolean z80_emulator(z80info *z80, int count);
+/* main.c contains vm class */
 
-extern int nobdos;
+vm *vm_new();
+void vm_resetterm(vm *obj);
+void vm_setterm(vm *obj);
+boolean vm_input(vm *obj, z80info *z80, byte haddr, byte laddr, byte *val);
+void vm_output(vm *obj, z80info *z80, byte haddr, byte laddr, byte data);
+void vm_haltcpu(vm *obj, z80info *z80);
+word vm_read_mem(vm *obj, z80info *z80, word addr);
+word vm_write_mem(vm *obj, z80info *z80, word addr, byte val);
+void vm_undefinstr(vm *obj, z80info *z80, byte instr);
+boolean vm_loadfile(z80info *z80, const char *fname);
+void vm_destroy(vm *obj);
 
-/* main.c */
-extern void resetterm(void);
-extern void setterm(void);
-extern boolean input(z80info *z80, byte haddr, byte laddr, byte *val);
-extern void output(z80info *z80, byte haddr, byte laddr, byte data);
-extern void haltcpu(z80info *z80);
-extern word read_mem(z80info *z80, word addr);
-extern word write_mem(z80info *z80, word addr, byte val);
-extern void undefinstr(z80info *z80, byte instr);
-extern boolean loadfile(z80info *z80, const char *fname);
+/* bios.c class */
+typedef struct bios_s bios;
 
-/* bios.c */
-extern void bios(z80info *z80, unsigned int fn);
-extern void sysreset(z80info *z80);
-extern void warmboot(z80info *z80);
-extern void finish(z80info *z80);
+bios *bios_new(vm *vm);
+void bios_set_silent_exit(bios *obj, int silent_exit);
+void bios_call(bios *obj, z80info *z80, unsigned int fn);
+void bios_sysreset(bios *obj, z80info *z80);
+void bios_warmboot(bios *obj, z80info *z80);
+void bios_finish(bios *obj, z80info *z80);
+void bios_destroy(bios *obj);
 
 /* disassem.c */
 extern int disassemlen(void);
 extern int disassem(z80info *z80, word start, FILE *fp);
-
-/* bdos */
-#define BDOS_HOOK 0xDC06
-void check_BDOS_hook(z80info *z80);
-extern int silent_exit;
-extern char *stuff_cmd;
-extern int exec;
-extern int trace_bdos;
-extern int strace;
-char *bdos_decode(int n);
-int bdos_fcb(int n);
-void bdos_fcb_dump(z80info *z80);
 
 #endif /* __DEFS_H_ */

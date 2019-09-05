@@ -10,12 +10,7 @@
 #include <string.h>
 #include "defs.h"
 
-int nobdos;
-int strace;
-int bdos_return = -1;
-
 /* All the following macros assume access to a parameter named "z80" */
-
 
 /* entry in "REGPAIRXY[]" to get to the IX or IY registers */
 #define XYPAIR 2
@@ -178,12 +173,14 @@ static boolean parity_inited = FALSE;
 \*-----------------------------------------------------------------------*/
 
 boolean
-z80_emulator(z80info *z80, int count)
+z80_run(z80info *z80, int count)
 {
 	byte t = 0, t1, t2, cy, v, *r = NULL;
 	word tt, tt2, hh, vv, *rr;
 	longword ttt;
 	int i, j, h, n, s;
+	z80info *obj;
+	obj = z80;
 
 	/* main loop  --  all "goto"s eventually end up here */
 infloop:
@@ -199,7 +196,7 @@ infloop:
 
 		/* HALT execution if desired - this is for tracing & such */
 		if (HALT)
-			haltcpu(z80);
+			vm_haltcpu(z80->vm, z80);
 
 		/* "i" is used to see if we need to get the next opcode or not*/
 		i = TRUE;
@@ -672,11 +669,11 @@ contsw:
 	case 0x27:					/* daa */
 		i = 0;
 		t = 0x00;
-		if (F & CARRY || A > 0x99) {
+		if ((F & CARRY) || A > 0x99) {
 			t |= 0x60;
 			i = 1;
 		}
-		if (F & HALF || (A & MASK4) > 9)
+		if ((F & HALF) || (A & MASK4) > 9)
 			t |= 0x06;
 		arith8(t, 0, F & NEGATIVE);
 		setflag(CARRY, i);
@@ -945,56 +942,28 @@ contsw:
 	/* input & output group */
 
 	case 0xDB:					/* in a,n */
-		if (!input(z80, A, MEM(PC), &t1))
+		if (!vm_input(z80->vm, z80, A, MEM(PC), &t1))
 			return FALSE;
 
 		A = t1;
 		PC++;
 		break;
 	case 0xD3:					/* out a,n */
-		output(z80, A, MEM(PC), A);
+		vm_output(z80->vm, z80, A, MEM(PC), A);
 		PC++;
 		break;
 
 
 	default: 
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}					/* end of main "switch" */
 
-	/* Trace system calls */
-	if (strace && PC == BDOS_HOOK)
-	{
-	        printf("\r\nbdos call %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
-		for (i = 0; i < 8; ++i)
-		    printf(" %4x", z80->mem[SP + 2*i]
-			   + 256 * z80->mem[SP + 2*i + 1]);
-		printf(")\r\n");
-		bdos_return = SP + 2;
-		if (bdos_fcb(C))
-			bdos_fcb_dump(z80);
-	}
-
-	if (SP == bdos_return)
-	{
-	        printf("\r\nbdos return %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
-		for (i = 0; i < 8; ++i)
-		    printf(" %4x", z80->mem[SP + 2*i]
-			   + 256 * z80->mem[SP + 2*i + 1]);
-		printf(")\r\n");
-		bdos_return = -1;
-		if (bdos_fcb(C))
-			bdos_fcb_dump(z80);
-	}
-
-	if (!nobdos && PC == BDOS_HOOK)
-	{
-		check_BDOS_hook(z80);
-	}
+	/** Notify the interceptor if any */
+	if (z80->intercept)
+	    z80->intercept(z80->intercept_ctx, z80);
 
 	goto infloop;
-
-
 
 	/* bit-twiddling instructions */
 bitinstr:
@@ -1354,7 +1323,7 @@ bitinstr:
 		break;
 
 	default: 
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "bitinstr" "switch" */
 
@@ -1549,7 +1518,7 @@ ireginstr:
 
 
 	default:
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "ireginstr" "switch" */
 
@@ -1769,7 +1738,7 @@ extinstr:
 	case 0x68:					/* in l,c */
 	case 0x70:					/* in ?,c */
 	case 0x78:					/* in a,c */
-		if (!input(z80, B, C, &t1))
+		if (!vm_input(z80->vm, z80, B, C, &t1))
 			return FALSE;
 
 		v = *REG[(t >> 3) & MASK3] = t1;
@@ -1787,14 +1756,14 @@ extinstr:
 	case 0x69:					/* out l,c */
 	case 0x79:					/* out a,c */
 	case 0x41:					/* out b,c */
-		output(z80, B, C, *REG[(t >> 3) & MASK3]);
+		vm_output(z80->vm, z80, B, C, *REG[(t >> 3) & MASK3]);
 		break;
 
 	case 0xA2:					/* ini */
 	case 0xAA:					/* ind */
 	case 0xB2:					/* inir */
 	case 0xBA:					/* indr */
-		if (!input(z80, B, C, &t1))
+		if (!vm_input(z80->vm, z80, B, C, &t1))
 			return FALSE;
 
 		SETMEM(HL, t1);
@@ -1817,7 +1786,7 @@ extinstr:
 	case 0xB3:					/* otir */
 	case 0xBB:					/* otdr */
 		resetflag(ZERO, --B);
-		output(z80, B, C, MEM(HL));
+		vm_output(z80->vm, z80, B, C, MEM(HL));
 
 		if (t & BIT3)
 			HL--;
@@ -1833,7 +1802,7 @@ extinstr:
 
 
 	default:
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "extinstr" "switch" */
 
@@ -1944,7 +1913,7 @@ iregbitinstr:
 
 
 	default: 
-		undefinstr(z80, t);
+		vm_undefinstr(z80->vm, z80, t);
 		break;
 	}	/* end of "iregbitinstr" "switch" */
 
@@ -1956,8 +1925,8 @@ iregbitinstr:
 
 
 /* initialize the z80 struct with sane stuff */
-z80info *
-init_z80info(z80info *z80)
+static z80info *
+init_z80info(z80info *z80, vm *vm)
 {
 	int i;
 
@@ -2004,17 +1973,13 @@ init_z80info(z80info *z80)
 	REGIR[0] = &I;
 	REGIR[1] = &R;
 
-	/* initialize the other misc stuff */
-	z80->trace = FALSE;
-	z80->step = FALSE;
-	z80->sig = 0;
-	z80->syscall = FALSE;
-
 	/* initialize the CP/M BIOS data */
 	z80->drive = 0;
 	z80->dma = 0x80;
 	z80->track = 0;
 	z80->sector = 1;
+
+	z80->vm = vm;
 
 	/* initialize the global parity array if necessary */
 	if (!parity_inited)
@@ -2038,17 +2003,9 @@ init_z80info(z80info *z80)
 }
 
 z80info *
-destroy_z80info(z80info *z80)
+z80_new(vm * vm)
 {
-	/* free the mem array if allocated above */
-	/* free(z80->mem); */
-	return z80;
-}
-
-z80info *
-new_z80info(void)
-{
-	z80info *z80 = (z80info*)malloc(sizeof *z80);
+	z80info *z80 = malloc(sizeof *z80);
 
 	if (z80 == NULL)
 	{
@@ -2056,15 +2013,19 @@ new_z80info(void)
 		return NULL;
 	}
 
-	return init_z80info(z80);
+	return init_z80info(z80, vm);
 }
 
 void
-delete_z80info(z80info *z80)
+z80_set_interceptor(z80info *z80, void *intercept_ctx,
+        void (*intercept)(void *, struct z80info *))
 {
-	if (z80 == NULL)
-		return;
+    z80->intercept_ctx = intercept_ctx;
+    z80->intercept = intercept;
+}
 
-	destroy_z80info(z80);
+void
+z80_destroy(z80info *z80)
+{
 	free(z80);
 }

@@ -19,7 +19,7 @@ CFLAGS = -g -pipe -Wall -Wextra -pedantic -ansi \
 LDFLAGS = 
 
 FILES = README.md Makefile A-Hdrive B-Hdrive cpmws.png \
-	bdos.c bios.c cpm.c cpmdisc.h defs.h disassem.c main.c vt.c vt.h z80.c \
+	bdos.c bdos.h bios.c cpm.c cpmdisc.h defs.h disassem.c main.c vt.c vt.h z80.c \
 	bye.mac getunix.mac putunix.mac cpmtool.c
 
 OBJS =	bios.o \

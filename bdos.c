@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "defs.h"
+#include "bdos.h"
 #include "vt.h"
 
 #define BIOS 0xFE00
@@ -16,13 +17,57 @@
 #define DPB0 (DPH0 + 0x0010)
 #define DIRBUF 0xff80
 #define CPMLIBDIR "./"
-static int storedfps = 0;
-unsigned short usercode = 0x00;
-int restricted_mode = 0;
-int silent_exit = 0;
-char *stuff_cmd = 0;
-int exec = 0;
-int trace_bdos = 0;
+
+/*
+FCB related numbers
+*/
+#define BlkSZ 128	/* CP/M block size */
+#define BlkEX 128	/* Number of blocks on an extension */
+#define BlkS2 4096	/* Number of blocks on a S2 (module) */
+#define MaxCR 128	/* Maximum value the CR field can take */
+#define MaxRC 127	/* Maximum value the RC field can take */
+#define MaxEX 31	/* Maximum value the EX field can take */
+#define MaxS2 15	/* Maximum value the S2 (modules) field can take - Can be set to 63 to emulate CP/M Plus */
+
+struct bdos_s {
+	vm *vm;
+	bios *bios;
+	char *cmd;
+	int exec;
+	int trace_bdos;
+	int storedfps;
+	unsigned short usercode;
+	int restricted_mode;
+    DIR *dp;
+    unsigned sfn;
+};
+
+bdos *bdos_new(vm *vm, bios *bios)
+{
+	bdos *obj = calloc(1, sizeof(bdos));
+	obj->vm = vm;
+	obj->bios = bios;
+	return obj;
+}
+
+void bdos_set_cmd(bdos *obj, char *cmd)
+{
+	obj->cmd = cmd;
+}
+
+void bdos_set_exec(bdos *obj, int exec)
+{
+	obj->exec = exec;
+}
+
+void bdos_set_trace_bdos(bdos *obj, int trace_bdos)
+{
+	obj->trace_bdos = trace_bdos;
+}
+
+void bdos_destroy(bdos *obj) {
+	free(obj);
+}
 
 /* Kill CP/M command line prompt */
 
@@ -36,7 +81,7 @@ static void killprompt()
     vt52('\b');
 }
 
-char *rdcmdline(z80info *z80, int max, int ctrl_c_enable)
+static char *rdcmdline(bdos *obj, z80info *z80, int max, int ctrl_c_enable)
 {
     int i, c;
     static char s[259];
@@ -45,18 +90,18 @@ char *rdcmdline(z80info *z80, int max, int ctrl_c_enable)
     max &= 0xff;
     i = 1;      /* number of next character */
 
-    if (stuff_cmd) {
+    if (obj->cmd) {
         killprompt();
-    	strcpy(s + i, stuff_cmd);
-    	/* printf("'%s'\n", stuff_cmd); */
-    	i = 1 + strlen(s + i);
-    	stuff_cmd = 0;
-    	silent_exit = 1;
-    	goto hit_rtn;
-    } else if (exec) {
+	strcpy(s + i, obj->cmd);
+	/* printf("'%s'\n", stuff_cmd); */
+	i = 1 + strlen(s + i);
+	obj->cmd = 0;
+	bios_set_silent_exit(obj->bios, 1);
+	goto hit_rtn;
+    } else if (obj->exec) {
         killprompt();
         printf("\r\n");
-        finish(z80);
+        bios_finish(obj->bios, z80);
         return s;
     }
 
@@ -89,8 +134,8 @@ loop:
 	    s[0] = i-1;
 	    s[i] = 0;
 	    if (!strcmp(s + 1, "bye")) {
-	    	printf("\r\n");
-	    	finish(z80);
+		printf("\r\n");
+		bios_finish(obj->bios, z80);
 	    }
 	    if (i <= max)
 		s[i] = '\r';
@@ -114,7 +159,7 @@ static struct FCB {
 } samplefcb;
 #endif
 
-static void FCB_to_filename(unsigned char *p, char *name) {
+static void FCB_to_filename(bdos *obj, unsigned char *p, char *name) {
     int i;
     char *org = name;
     /* strcpy(name, "test/");
@@ -129,11 +174,11 @@ static void FCB_to_filename(unsigned char *p, char *name) {
 		*name++ = tolower(p[i+9]);
     }
     *name = '\0';
-    if (trace_bdos)
+    if (obj->trace_bdos)
     	printf("File name is %s\r\n", org);
 }
 
-static void FCB_to_ufilename(unsigned char *p, char *name) {
+static void FCB_to_ufilename(bdos *obj, unsigned char *p, char *name) {
     int i;
     char *org = name;
     /* strcpy(name, "test/");
@@ -148,7 +193,7 @@ static void FCB_to_ufilename(unsigned char *p, char *name) {
 		*name++ = toupper(p[i+9]);
     }
     *name = '\0';
-    if (trace_bdos)
+    if (obj->trace_bdos)
     	printf("File name is %s\r\n", org);
 }
 
@@ -158,10 +203,10 @@ static struct stfps {
     char name[12];
 } stfps[100];
 
-static void storefp(z80info *z80, FILE *fp, unsigned where) {
+static void storefp(bdos *obj, z80info *z80, FILE *fp, unsigned where) {
     int i;
     int ind = -1;
-    for (i = 0; i < storedfps; ++i)
+    for (i = 0; i < obj->storedfps; ++i)
 	if (stfps[i].where == 0xffffU)
 	    ind = i;
 	else if (stfps[i].where == where) {
@@ -169,12 +214,12 @@ static void storefp(z80info *z80, FILE *fp, unsigned where) {
 	    goto putfp;
 	}
     if (ind < 0) {
-	if (++storedfps > 100) {
+	if (++obj->storedfps > 100) {
 	    fprintf(stderr, "out of fp stores!\n");
-            resetterm();
+            vm_resetterm(obj->vm);
 	    exit(1);
 	}
-	ind = storedfps - 1;
+	ind = obj->storedfps - 1;
     }
     stfps[ind].where = where;
  putfp:
@@ -185,14 +230,14 @@ static void storefp(z80info *z80, FILE *fp, unsigned where) {
 
 /* Lookup an FCB to find the host file. */
 
-static FILE *lookfp(z80info *z80, unsigned where) {
+static FILE *lookfp(bdos *obj, z80info *z80, unsigned where) {
     int i;
-    for (i = 0; i < storedfps; ++i)
+    for (i = 0; i < obj->storedfps; ++i)
 	if (stfps[i].where == where)
             if (memcmp(stfps[i].name, z80->mem+z80->regde+1, 11) == 0)
 	    return stfps[i].fp;
     /* fcb not found. maybe it has been moved? */
-    for (i = 0; i < storedfps; ++i)
+    for (i = 0; i < obj->storedfps; ++i)
 	if (stfps[i].where != 0xffffU &&
 	    !memcmp(z80->mem+z80->regde+1, stfps[i].name, 11)) {
 	    stfps[i].where = where;	/* moved FCB */
@@ -203,37 +248,37 @@ static FILE *lookfp(z80info *z80, unsigned where) {
 
 /* Report an error finding an FCB. */
 
-static void fcberr(z80info *z80, unsigned where) {
+static void fcberr(bdos *obj, z80info *z80, unsigned where) {
     int i;
 
     fprintf(stderr, "error: cannot find fp entry for FCB at %04x"
 	    " fctn %d, FCB named %s\n", where, z80->regbc & 0xff,
 	    z80->mem+where+1);
-    for (i = 0; i < storedfps; ++i)
+    for (i = 0; i < obj->storedfps; ++i)
 	if (stfps[i].where != 0xffffU)
 	    printf("%s %04x\n", stfps[i].name, stfps[i].where);
-    resetterm();
+    vm_resetterm(obj->vm);
     exit(1);
 }
 
 /* Get the host file for an FCB when it should be open. */
 
-static FILE *getfp(z80info *z80, unsigned where) {
+static FILE *getfp(bdos *obj, z80info *z80, unsigned where) {
     FILE *fp;
 
-    if (!(fp = lookfp(z80, where)))
-        fcberr(z80, where);
+    if (!(fp = lookfp(obj, z80, where)))
+        fcberr(obj, z80, where);
     return fp;
 }
 
-static void delfp(z80info *z80, unsigned where) {
+static void delfp(bdos *obj, z80info *z80, unsigned where) {
     int i;
-    for (i = 0; i < storedfps; ++i)
+    for (i = 0; i < obj->storedfps; ++i)
 	if (stfps[i].where == where) {
 	    stfps[i].where = 0xffffU;
 	    return;
 	}
-    fcberr(z80, where);
+    fcberr(obj, z80, where);
 }
 
 /* FCB fields */
@@ -288,9 +333,6 @@ static void delfp(z80info *z80, unsigned where) {
 
 /* Convert offset to high byte of extent number */
 #define SEQ_S2(n) (SEQ_EXTENT(n) / 32)
-
-static DIR *dp = NULL;
-static unsigned sfn = 0;
 
 char *bdos_decode(int n)
 {
@@ -383,6 +425,20 @@ void bdos_fcb_dump(z80info *z80)
 	       z80->mem[DE + 34], z80->mem[DE + 35]);
 }
 
+/* Calculates the file size */
+unsigned long filesize(FILE *fp)
+{
+    struct stat stbuf;
+    unsigned long r;
+    /* Get file size */
+    if (fstat(fileno(fp), &stbuf) || !S_ISREG(stbuf.st_mode)) {
+        return 0;
+    }
+    r = stbuf.st_size % BlkSZ;
+    return r ? stbuf.st_size + BlkSZ - r : stbuf.st_size;
+
+}
+
 /* Get count of records in current extent */
 
 int fixrc(z80info *z80, FILE *fp)
@@ -416,14 +472,17 @@ int fixrc(z80info *z80, FILE *fp)
 
 /* emulation of BDOS calls */
 
-void check_BDOS_hook(z80info *z80) {
+void bdos_check_hook(bdos *obj, z80info *z80) {
     int i;
     char name[32];
     char name2[32];
     FILE *fp;
     char *s, *t;
     const char *mode;
-    if (trace_bdos)
+    long fpos;
+    unsigned long len;
+
+    if (obj->trace_bdos)
     {
         printf("\r\nbdos %d %s (AF=%04x BC=%04x DE=%04x HL =%04x SP=%04x STACK=", C, bdos_decode(C), AF, BC, DE, HL, SP);
 	for (i = 0; i < 8; ++i)
@@ -433,7 +492,7 @@ void check_BDOS_hook(z80info *z80) {
     }
     switch (C) {
     case  0:    /* System Reset */
-	warmboot(z80);
+	bios_warmboot(obj->bios, z80);
 	return;
 #if 0
 	for (i = 0; i < 0x1600; ++i)
@@ -459,7 +518,7 @@ void check_BDOS_hook(z80info *z80) {
 		if (A == 3) {	/* ctrl-C pressed */
 		    /* PC = BIOS+3;
 		       check_BIOS_hook(); */
-		    warmboot(z80);
+		    bios_warmboot(obj->bios, z80);
 		    return;
 		}
 	    }
@@ -501,10 +560,10 @@ void check_BDOS_hook(z80info *z80) {
         B = H; A = L;
 	break;
     case 10:    /* Read Command Line */
-	s = rdcmdline(z80, *(unsigned char *)(t = (char *)(z80->mem + DE)), 1);
+	s = rdcmdline(obj, z80, *(unsigned char *)(t = (char *)(z80->mem + DE)), 1);
 	if (PC == BIOS+3) { 	/* ctrl-C pressed */
 	    /* check_BIOS_hook(); */		/* execute WBOOT */
-	    warmboot(z80);
+	    bios_warmboot(obj->bios, z80);
 	    return;
 	}
 	++t;
@@ -525,10 +584,10 @@ void check_BDOS_hook(z80info *z80) {
 	break;
     case 32:    /* Get/Set User Code */
 	if (E == 0xff) {  /* Get Code */
-	    HL = usercode;
+	    HL = obj->usercode;
             B = H; A = L;
 	} else {
-	    usercode = E;
+	    obj->usercode = E;
             HL = 0; /* Or does it get usercode? */
             B = H; A = L;
         }
@@ -546,20 +605,20 @@ void check_BDOS_hook(z80info *z80) {
 	/* storedfps = 0; */	/* WS crashes then */
 	HL = 0;
         B = H; A = L;
-	if (dp)
-	    closedir(dp);
+	if (obj->dp)
+	    closedir(obj->dp);
 	{   struct dirent *de;
-            if ((dp = opendir("."))) {
-                while ((de = readdir(dp))) {
+            if ((obj->dp = opendir("."))) {
+                while ((de = readdir(obj->dp))) {
                     if (strchr(de->d_name, '$')) {
                         A = 0xff;
                         break;
                     }
                 }
-                closedir(dp);
+                closedir(obj->dp);
             }
         }
-	dp = NULL;
+	obj->dp = NULL;
 	z80->dma = 0x80;
 	/* select only A:, all r/w */
 	break;
@@ -571,13 +630,13 @@ void check_BDOS_hook(z80info *z80) {
 	mode = "r+b";
     fileio:
         /* check if the file is already open */
-        if (!(fp = lookfp(z80, DE))) {
+        if (!(fp = lookfp(obj, z80, DE))) {
             /* not already open - try lowercase */
-            FCB_to_filename(z80->mem+DE, name);
+            FCB_to_filename(obj, z80->mem+DE, name);
 	if (!(fp = fopen(name, mode))) {
-	    FCB_to_ufilename(z80->mem+DE, name); /* Try all uppercase instead */
+	    FCB_to_ufilename(obj, z80->mem+DE, name); /* Try all uppercase instead */
             if (!(fp = fopen(name, mode))) {
-	            FCB_to_filename(z80->mem+DE, name);
+	            FCB_to_filename(obj, z80->mem+DE, name);
 		    if (*mode == 'r') {
 			char ss[50];
 			snprintf(ss, sizeof(ss), "%s/%s", CPMLIBDIR, name);
@@ -595,7 +654,7 @@ void check_BDOS_hook(z80info *z80) {
             }
             }
             /* where to store fp? */
-            storefp(z80, fp, DE);
+            storefp(obj, z80, fp, DE);
 	}
 	/* success */
 
@@ -609,11 +668,14 @@ void check_BDOS_hook(z80info *z80) {
 	/* memset(z80->mem + DE + 33, 0, 3); */
 
 	/* We need to set high bit of S2: means file is open? */
-	z80->mem[DE + FCB_S2] |= 0x80;
+	z80->mem[DE + FCB_S2] = 0;
+	/* z80->mem[DE + FCB_S2] |= 0x80; */
 
-	z80->mem[DE + FCB_RC] = 0;	/* rc field of FCB */
+    len = filesize(fp) / 128;
 
-	if (fixrc(z80, fp)) { /* Not a real file? */
+	z80->mem[DE + FCB_RC] = len;	/* rc field of FCB */
+/*
+	if (fixrc(z80, fp)) {
 	    HL = 0xFF;
             B = H; A = L;
 	    F = 0;
@@ -621,6 +683,7 @@ void check_BDOS_hook(z80info *z80) {
             delfp(z80, DE);
 	    break;
 	}
+*/
 	HL = 0;
         B = H; A = L;
 	F = 0;
@@ -630,7 +693,7 @@ void check_BDOS_hook(z80info *z80) {
         {
             long host_size, host_exts;
 
-	    if (!(fp = lookfp(z80, DE))) {
+	    if (!(fp = lookfp(obj, z80, DE))) {
 		/* if the FBC is unknown, return an error */
 		HL = 0xFF;
 		B = H, A = L;
@@ -647,7 +710,7 @@ void check_BDOS_hook(z80info *z80) {
                     ftruncate(fileno(fp), host_size);
                 }
             }
-	delfp(z80, DE);
+	delfp(obj, z80, DE);
 	fclose(fp);
             z80->mem[DE + FCB_S2] &= 0x7F; /* Clear high bit: indicates closed */
 	HL = 0;
@@ -656,25 +719,25 @@ void check_BDOS_hook(z80info *z80) {
         }
 	break;
     case 17:	/* search for first */
-	if (dp)
-	    closedir(dp);
-	if (!(dp = opendir("."))) {
+	if (obj->dp)
+	    closedir(obj->dp);
+	if (!(obj->dp = opendir("."))) {
 	    fprintf(stderr, "opendir fails\n");
-            resetterm();
+            vm_resetterm(obj->vm);
 	    exit(1);
 	}
-	sfn = DE;
+	obj->sfn = DE;
 	/* fall through */
     case 18:	/* search for next */
-	if (!dp)
+	if (!obj->dp)
 	    goto retbad;
 	{   struct dirent *de;
 	    unsigned char *p;
 	    const char *sr;
 	nocpmname:
-	    if (!(de = readdir(dp))) {
-		closedir(dp);
-		dp = NULL;
+	    if (!(de = readdir(obj->dp))) {
+		closedir(obj->dp);
+		obj->dp = NULL;
 	    retbad:
 	        HL = 0xff;
                 B = H; A = L;
@@ -710,7 +773,7 @@ void check_BDOS_hook(z80info *z80) {
 	    /* OK, fcb block is filled */
 	    /* match name */
 	    p -= 11;
-	    sr = (char *)(z80->mem + sfn);
+	    sr = (char *)(z80->mem + obj->sfn);
 	    for (i = 1; i <= 12; ++i)
 		if (sr[i] != '?' && sr[i] != p[i])
 		    goto nocpmname;
@@ -722,31 +785,45 @@ void check_BDOS_hook(z80info *z80) {
 	}
 	break;
     case 19:	/* delete file (no wildcards yet) */
-	FCB_to_filename(z80->mem + DE, name);
+	FCB_to_filename(obj, z80->mem + DE, name);
 	unlink(name);
 	HL = 0;
         B = H; A = L;
 	break;
     case 20:	/* read sequential */
-	fp = getfp(z80, DE);
-    readseq:
-	if (!fseek(fp, SEQ_ADDRESS, SEEK_SET) && ((i = fread(z80->mem+z80->dma, 1, 128, fp)) > 0)) {
-	    long ofst = ftell(fp) + 127;
+	fp = getfp(obj, z80, DE);
+    /* readseq: */
+        fpos = (z80->mem[DE + FCB_S2] & MaxS2) * BlkS2 * BlkSZ +
+         z80->mem[DE + FCB_EX] * BlkEX * BlkSZ +
+         z80->mem[DE + FCB_CR] * BlkSZ;
+	if (!fseek(fp, fpos, SEEK_SET) && ((i = fread(z80->mem+z80->dma, 1, 128, fp)) > 0)) {
+	    /* long ofst = ftell(fp) + 127; */
 	    if (i != 128)
 		memset(z80->mem+z80->dma+i, 0x1a, 128-i);
-	    z80->mem[DE + FCB_CR] = SEQ_CR(ofst);
-	    z80->mem[DE + FCB_EX] = SEQ_EX(ofst);
-	    z80->mem[DE + FCB_S2] = (0x80 | SEQ_S2(ofst));
-	    fixrc(z80, fp);
-	    HL = 0x00;
-            B = H; A = L;
+        /* Update FCB fields */
+        
+        z80->mem[DE + FCB_CR] = z80->mem[DE + FCB_CR] + 1;
+        if (z80->mem[DE + FCB_CR] > MaxCR) {
+            z80->mem[DE + FCB_CR] = 1;
+            z80->mem[DE + FCB_EX] = z80->mem[DE + FCB_EX] + 1;
+        }
+        if (z80->mem[DE + FCB_EX] > MaxEX) {
+            z80->mem[DE + FCB_EX] = 0;
+            z80->mem[DE + FCB_S2] = z80->mem[DE + FCB_S2] + 1;
+        }
+        if (z80->mem[DE + FCB_S2] > MaxS2) {
+            HL = 0xFE;
+        } else {
+            HL = 0x00;
+        }
+        /* fixrc(z80, fp); */
 	} else {
 	    HL = 0x1;	/* ff => pip error */
-            B = H; A = L;
 	}    
+        B = H; A = L;
 	break;
     case 21:	/* write sequential */
-	fp = getfp(z80, DE);
+	fp = getfp(obj, z80, DE);
     writeseq:
 	if (!fseek(fp, SEQ_ADDRESS, SEEK_SET) && fwrite(z80->mem+z80->dma, 1, 128, fp) == 128) {
 	    long ofst = ftell(fp);
@@ -766,8 +843,8 @@ void check_BDOS_hook(z80info *z80) {
 	mode = "w+b";
 	goto fileio;
     case 23:	/* rename file */
-	FCB_to_filename(z80->mem + DE, name);
-	FCB_to_filename(z80->mem + DE + 16, name2);
+	FCB_to_filename(obj, z80->mem + DE, name);
+	FCB_to_filename(obj, z80->mem + DE + 16, name2);
 	/* printf("rename %s %s called\n", name, name2); */
 	rename(name, name2);
 	HL = 0;
@@ -795,19 +872,31 @@ void check_BDOS_hook(z80info *z80) {
     case 33:	/* read random record */
         {
         long ofst;
-	fp = getfp(z80, DE);
+	fp = getfp(obj, z80, DE);
 	/* printf("data is %02x %02x %02x\n", z80->mem[z80->regde+33],
 	       z80->mem[z80->regde+34], z80->mem[z80->regde+35]); */
-	ofst = ADDRESS;
-        z80->mem[DE + FCB_CR] = SEQ_CR(ofst);
-	z80->mem[DE + FCB_EX] = SEQ_EX(ofst);
-	z80->mem[DE + FCB_S2] = (0x80 | SEQ_S2(ofst));
-	goto readseq;
+
+	ofst = (z80->mem[DE + FCB_R2] << 16) | (z80->mem[DE + FCB_R1] << 8) |
+		z80->mem[DE + FCB_R0];
+	fpos = ofst * BlkSZ;
+	if (!fseek(fp, fpos, SEEK_SET) && ((i = fread(z80->mem+z80->dma, 1, 128, fp)) > 0)) {
+	    if (i != 128)
+		memset(z80->mem+z80->dma+i, 0x1a, 128-i);
+	    /* fixrc(z80, fp); */
+	    z80->mem[DE + FCB_CR] = ofst & 0x7f;
+	    z80->mem[DE + FCB_EX] = (ofst >> 7) & 0x1f;
+	    z80->mem[DE + FCB_S2] = (ofst >> 12) & 0xff;
+	    HL = 0x00;
+	} else {
+	    HL = 0x1;	/* ff => pip error */
 	}
+	    B = H; A = L;
+	}
+	break;
     case 34:	/* write random record */
         {
         long ofst;
-	fp = getfp(z80, DE);
+	fp = getfp(obj, z80, DE);
 	/* printf("data is %02x %02x %02x\n", z80->mem[z80->regde+33],
 	       z80->mem[z80->regde+34], z80->mem[z80->regde+35]); */
 	ofst = ADDRESS;
@@ -817,11 +906,11 @@ void check_BDOS_hook(z80info *z80) {
 	goto writeseq;
 	}
     case 35:	/* compute file size */
-	fp = getfp(z80, DE);
+	fp = getfp(obj, z80, DE);
 	fseek(fp, 0L, SEEK_END);
 	/* fall through */
     case 36:	/* set random record */
-	fp = getfp(z80, DE);
+	fp = getfp(obj, z80, DE);
 	{   
 	    long ofst = ftell(fp) + 127;
 	    long pos = (ofst >> 7);
@@ -839,7 +928,7 @@ void check_BDOS_hook(z80info *z80) {
     case 41:
 	for (s = (char *)(z80->mem + DE); *s; ++s)
 	    *s = tolower(*(unsigned char *)s);
-	HL = (restricted_mode || chdir((char  *)(z80->mem + DE))) ? 0xff : 0x00;
+	HL = (obj->restricted_mode || chdir((char  *)(z80->mem + DE))) ? 0xff : 0x00;
         B = H; A = L;
 	break;
     default:
@@ -850,7 +939,7 @@ void check_BDOS_hook(z80info *z80) {
 	    printf(" %4x", z80->mem[SP + 2*i]
 		   + 256 * z80->mem[SP + 2*i + 1]);
 	printf("\r\n");
-	resetterm();
+	vm_resetterm(obj->vm);
 	exit(1);
     }
     z80->mem[PC = DIRBUF-1] = 0xc9; /* Return instruction */
