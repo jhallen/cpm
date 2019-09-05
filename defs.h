@@ -39,17 +39,7 @@
 #   endif
 #endif
 
-/* misc. handy defs */
-
-#ifndef TRUE
-#define TRUE	1
-#endif
-
-#ifndef FALSE
-#define FALSE	0
-#endif
-
-typedef int boolean;
+typedef enum { FALSE, TRUE } boolean;
 
 #define CNTL(c) ((c) & 037)	/* convert a char to its control equivalent */
 
