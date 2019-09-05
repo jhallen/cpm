@@ -436,7 +436,7 @@ unsigned long filesize(FILE *fp)
         return 0;
     }
     r = stbuf.st_size % BlkSZ;
-    return r ? stbuf.st_size + BlkSZ - r : stbuf.st_size;
+    return r ? (unsigned)stbuf.st_size + BlkSZ - r : (unsigned)stbuf.st_size;
 
 }
 
