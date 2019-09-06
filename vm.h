@@ -3,9 +3,10 @@
 
 #include "z80.h"
 #include "defs.h"
-#include "bios.h"
 
 /* main.c contains vm class */
+
+typedef struct vm_s vm;
 
 vm *vm_new();
 void vm_resetterm(vm *obj);

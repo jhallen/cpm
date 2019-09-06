@@ -979,6 +979,7 @@ dotime(bios *obj, z80info *z80)
     struct tm *t;
     word days;
     int y;
+    (void)obj;
 
     if (C != 0)		/* do not support setting the time yet */
 		return;

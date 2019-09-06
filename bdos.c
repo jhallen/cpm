@@ -149,6 +149,8 @@ loop:
 	fflush(stdout);
     }
     goto loop;
+    /* Never reached */
+    return NULL;
 }
 
 
@@ -539,7 +541,8 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
             B = H; A = L;
 	    F = 0;
 	    break;
-	} /* FALLTHRU */
+	}
+	/* no break */
 	case 0xfd:  HL = kget(0);
             B = H; A = L;
 	    F = 0;
@@ -728,7 +731,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
 	    exit(1);
 	}
 	obj->sfn = DE;
-	/* fall through */
+	/* no break */
     case 18:	/* search for next */
 	if (!obj->dp)
 	    goto retbad;
@@ -915,7 +918,7 @@ void bdos_check_hook(bdos *obj, z80info *z80) {
     case 35:	/* compute file size */
 	fp = getfp(obj, z80, DE);
 	fseek(fp, 0L, SEEK_END);
-	/* fall through */
+	/* no break */
     case 36:	/* set random record */
 	fp = getfp(obj, z80, DE);
 	{   

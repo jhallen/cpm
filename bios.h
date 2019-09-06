@@ -3,6 +3,7 @@
 
 #include "defs.h"
 #include "z80.h"
+#include "vm.h"
 
 /* bios.c class */
 typedef struct bios_s bios;

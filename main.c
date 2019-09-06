@@ -1189,8 +1189,29 @@ main(int argc, const char *argv[])
 	if (cmd[0])
 		bdos_set_cmd(obj->bd, cmd);
 
-	z80 = z80_new(obj);
+	z80 = z80_new();
+
+	/* Bind the instruction handling interface.
+	 * Function pointers are cast to the type with the generalised instance
+	 * type.
+	 */
+	z80_set_proc(z80, obj,
+			(void (*)(void *, z80info *))vm_haltcpu,
+			(void (*)(void *, z80info *, byte))vm_undefinstr);
+
+	/* Bind the I/O interface */
+	z80_set_io(z80, obj,
+			(boolean (*)(void *, z80info *, byte, byte, byte *))vm_input,
+			(void (*)(void *, z80info *, byte, byte, byte))vm_output);
+
+	/* Bind the memory interface */
+	z80_set_mem(z80, obj,
+			(word (*)(void *, z80info *, word))vm_read_mem,
+			(word (*)(void *, z80info *, word, byte))vm_write_mem);
+
+	/* Set up the CPU loop interceptor */
     z80_set_interceptor(z80, obj, intercept);
+
     if (!z80) {
 	z80_destroy(z80);
 	vm_destroy(obj);
