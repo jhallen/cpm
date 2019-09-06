@@ -726,7 +726,7 @@ int2addr(unsigned char *addr, int val)
 
 FILE *cpm_file[CPM_FILES];
 
-int cpm_file_alloc(FILE *f)
+static int cpm_file_alloc(FILE *f)
 {
 	int x;
 	for (x = 0; x != CPM_FILES; ++x)
@@ -737,7 +737,7 @@ int cpm_file_alloc(FILE *f)
 	return -1;
 }
 
-FILE *cpm_file_get(int idx)
+static FILE *cpm_file_get(int idx)
 {
 	if (idx < 0 || idx > CPM_FILES)
 		return 0;
@@ -745,7 +745,7 @@ FILE *cpm_file_get(int idx)
 		return cpm_file[idx];
 }
 
-int cpm_file_free(int x)
+static int cpm_file_free(int x)
 {
 	if (x >= 0 && x < CPM_FILES && cpm_file[x]) {
 		int rtn = fclose(cpm_file[x]);

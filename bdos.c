@@ -429,7 +429,7 @@ void bdos_fcb_dump(z80info *z80)
 }
 
 /* Calculates the file size */
-unsigned long filesize(FILE *fp)
+static unsigned long filesize(FILE *fp)
 {
     struct stat stbuf;
     unsigned long r;
@@ -444,7 +444,7 @@ unsigned long filesize(FILE *fp)
 
 /* Get count of records in current extent */
 
-int fixrc(z80info *z80, FILE *fp)
+static int fixrc(z80info *z80, FILE *fp)
 {
     struct stat stbuf;
     unsigned long size;

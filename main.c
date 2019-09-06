@@ -111,7 +111,7 @@ void vm_destroy(vm *obj)
 }
 
 
-char *jgets(char *s, int len, FILE *f)
+static char *jgets(char *s, int len, FILE *f)
 {
 	char *rtn = fgets(s, len, f);
 	if (rtn)
