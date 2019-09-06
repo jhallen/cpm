@@ -62,7 +62,8 @@
 /* max number of the BIOS drive tables */
 #define MAXDISCS	16
 
-/* TODO: Move the states irrelevant to the CPU to the respective classes */
+typedef struct z80state_s z80state;
+
 typedef struct z80info
 {
     boolean event;
@@ -82,12 +83,8 @@ typedef struct z80info
     word *regixy[2];
     byte *regir[2];
 
-    /* Private: CPU Interceptor is invoked on each and every loop */
-    void *intercept_ctx;
-    void (*intercept)(void *, struct z80info *);
-
-    /* Virtual Machine pointer */
-    vm *vm;
+    /* Private state */
+    z80state *pvt;
 
     /* 64k bytes - may be allocated separately if desired */
     byte mem[0x10000L];
@@ -115,11 +112,11 @@ typedef struct z80info
 #ifdef MEM_BREAK
 #    define MEM(addr)	\
 		(z80->membrk[(word)(addr)] ?	\
-		vm_read_mem(obj->vm, z80, addr) :	\
+		z80_read_mem(z80, addr) :	\
 		z80->mem[(word)(addr)])
 #    define SETMEM(addr, val)	\
 		(z80->membrk[(word)(addr)] ?	\
-		vm_write_mem(obj->vm, z80, addr, val) :	\
+		z80_write_mem(z80, addr, val) :	\
 		(z80->mem[(word)(addr)] = (byte)(val)))
 
 	/* various flags for "membrk" - others may be added */
@@ -182,9 +179,32 @@ typedef struct z80info
 
 /* z80.c class */
 
-z80info *z80_new(vm *vm);
+z80info *z80_new(void);
+
+/* Binds the instruction handling interface */
+void z80_set_proc(z80info *z80, void *proc_ctx,
+		void (*proc_haltcpu)(void *proc_ctx, z80info *z80),
+		void (*proc_undefinstr)(void *proc_ctxj, z80info *z80, byte instr));
+
+/* Binds the I/O interface */
+void z80_set_io(z80info *z80, void *io_ctx,
+		boolean (*io_input)(void *io_ctx, z80info *z80, byte haddr, byte laddr,
+				byte *val),
+		void (*io_output)(void *io_ctx, z80info *z80, byte haddr, byte laddr,
+				byte data));
+
+/* Binds the memory interface */
+void z80_set_mem(z80info *z80, void *mem_ctx,
+		word (*mem_read_mem)(void *mem_ctx, z80info *z80, word addr),
+		word (*mem_write_mem)(void *mem_ctx, z80info *z80, word addr, byte val));
+
+/* Sets the CPU loop interceptor */
 void z80_set_interceptor(z80info *z80, void *intercept_ctx,
 		void (*intercept)(void *, struct z80info *));
+
+word z80_read_mem(z80info *z80, word addr);
+word z80_write_mem(z80info *z80, word addr, byte val);
+
 boolean z80_run(z80info *z80, int count);
 void z80_destroy(z80info *z80);
 

@@ -49,7 +49,4 @@ typedef unsigned char byte;
 typedef unsigned short word;
 typedef unsigned long longword;
 
-/* TODO: Move this to vm.h when the dependency tree is stable */
-typedef struct vm_s vm;
-
 #endif /* __DEFS_H_ */

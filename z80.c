@@ -165,8 +165,69 @@ static boolean parity_inited = FALSE;
 	setflag(NEGATIVE, n);\
 }
 
+/* z80 Internal state -- mostly bindings */
+struct z80state_s {
 
+	/* Processing hooks */
+	void *proc_ctx;
+	void (*proc_haltcpu)(void *proc_ctx, z80info *z80);
+	void (*proc_undefinstr)(void *proc_ctxj, z80info *z80, byte instr);
 
+	/* I/O interface */
+	void *io_ctx;
+	boolean (*io_input)(void *io_ctx, z80info *z80, byte haddr, byte laddr,
+			byte *val);
+	void (*io_output)(void *io_ctx, z80info *z80, byte haddr, byte laddr,
+			byte data);
+
+	/* Memory interface */
+	void *mem_ctx;
+	word (*mem_read)(void *mem_ctx, z80info *z80, word addr);
+	word (*mem_write)(void *mem_ctx, z80info *z80, word addr, byte val);
+
+    /* Private: Optional CPU Interceptor is invoked on each and every loop */
+    void *intercept_ctx;
+    void (*intercept)(void *intercept_ctx, struct z80info *z80);
+};
+
+void z80_set_proc(z80info *z80, void *proc_ctx,
+		void (*proc_haltcpu)(void *proc_ctx, z80info *z80),
+		void (*proc_undefinstr)(void *proc_ctxj, z80info *z80, byte instr))
+{
+	z80->pvt->proc_ctx = proc_ctx;
+	z80->pvt->proc_haltcpu = proc_haltcpu;
+	z80->pvt->proc_undefinstr = proc_undefinstr;
+}
+
+void z80_set_io(z80info *z80, void *io_ctx,
+		boolean (*io_input)(void *io_ctx, z80info *z80, byte haddr, byte laddr,
+				byte *val),
+		void (*io_output)(void *io_ctx, z80info *z80, byte haddr, byte laddr,
+				byte data))
+{
+	z80->pvt->io_ctx = io_ctx;
+	z80->pvt->io_input = io_input;
+	z80->pvt->io_output = io_output;
+}
+
+void z80_set_mem(z80info *z80, void *mem_ctx,
+		word (*mem_read)(void *mem_ctx, z80info *z80, word addr),
+		word (*mem_write)(void *mem_ctx, z80info *z80, word addr, byte val))
+{
+	z80->pvt->mem_ctx = mem_ctx;
+	z80->pvt->mem_read = mem_read;
+	z80->pvt->mem_write = mem_write;
+}
+
+word z80_read_mem(z80info *z80, word addr)
+{
+	return z80->pvt->mem_read(z80->pvt->mem_ctx, z80, addr);
+}
+
+word z80_write_mem(z80info *z80, word addr, byte val)
+{
+	return z80->pvt->mem_write(z80->pvt->mem_ctx, z80, addr, val);
+}
 
 /*-----------------------------------------------------------------------*\
  |  z80  --  emulate a z80  --  labels & gotos are used here (if you
@@ -197,7 +258,7 @@ infloop:
 
 		/* HALT execution if desired - this is for tracing & such */
 		if (HALT)
-			vm_haltcpu(z80->vm, z80);
+			z80->pvt->proc_haltcpu(z80->pvt->proc_ctx, z80);
 
 		/* "i" is used to see if we need to get the next opcode or not*/
 		i = TRUE;
@@ -943,26 +1004,26 @@ contsw:
 	/* input & output group */
 
 	case 0xDB:					/* in a,n */
-		if (!vm_input(z80->vm, z80, A, MEM(PC), &t1))
+		if (!z80->pvt->io_input(z80->pvt->io_ctx, z80, A, MEM(PC), &t1))
 			return FALSE;
 
 		A = t1;
 		PC++;
 		break;
 	case 0xD3:					/* out a,n */
-		vm_output(z80->vm, z80, A, MEM(PC), A);
+		z80->pvt->io_output(z80->pvt->io_ctx, z80, A, MEM(PC), A);
 		PC++;
 		break;
 
 
 	default: 
-		vm_undefinstr(z80->vm, z80, t);
+		z80->pvt->proc_undefinstr(z80->pvt->proc_ctx, z80, t);
 		break;
 	}					/* end of main "switch" */
 
 	/** Notify the interceptor if any */
-	if (z80->intercept)
-	    z80->intercept(z80->intercept_ctx, z80);
+	if (z80->pvt->intercept)
+	    z80->pvt->intercept(z80->pvt->intercept_ctx, z80);
 
 	goto infloop;
 
@@ -1324,7 +1385,7 @@ bitinstr:
 		break;
 
 	default: 
-		vm_undefinstr(z80->vm, z80, t);
+		z80->pvt->proc_undefinstr(z80->pvt->proc_ctx, z80, t);
 		break;
 	}	/* end of "bitinstr" "switch" */
 
@@ -1519,7 +1580,7 @@ ireginstr:
 
 
 	default:
-		vm_undefinstr(z80->vm, z80, t);
+		z80->pvt->proc_undefinstr(z80->pvt->proc_ctx, z80, t);
 		break;
 	}	/* end of "ireginstr" "switch" */
 
@@ -1739,7 +1800,7 @@ extinstr:
 	case 0x68:					/* in l,c */
 	case 0x70:					/* in ?,c */
 	case 0x78:					/* in a,c */
-		if (!vm_input(z80->vm, z80, B, C, &t1))
+		if (!z80->pvt->io_input(z80->pvt->io_ctx, z80, B, C, &t1))
 			return FALSE;
 
 		v = *REG[(t >> 3) & MASK3] = t1;
@@ -1757,14 +1818,14 @@ extinstr:
 	case 0x69:					/* out l,c */
 	case 0x79:					/* out a,c */
 	case 0x41:					/* out b,c */
-		vm_output(z80->vm, z80, B, C, *REG[(t >> 3) & MASK3]);
+		z80->pvt->io_output(z80->pvt->io_ctx, z80, B, C, *REG[(t >> 3) & MASK3]);
 		break;
 
 	case 0xA2:					/* ini */
 	case 0xAA:					/* ind */
 	case 0xB2:					/* inir */
 	case 0xBA:					/* indr */
-		if (!vm_input(z80->vm, z80, B, C, &t1))
+		if (!z80->pvt->io_input(z80->pvt->io_ctx, z80, B, C, &t1))
 			return FALSE;
 
 		SETMEM(HL, t1);
@@ -1787,7 +1848,7 @@ extinstr:
 	case 0xB3:					/* otir */
 	case 0xBB:					/* otdr */
 		resetflag(ZERO, --B);
-		vm_output(z80->vm, z80, B, C, MEM(HL));
+		z80->pvt->io_output(z80->pvt->io_ctx, z80, B, C, MEM(HL));
 
 		if (t & BIT3)
 			HL--;
@@ -1803,7 +1864,7 @@ extinstr:
 
 
 	default:
-		vm_undefinstr(z80->vm, z80, t);
+		z80->pvt->proc_undefinstr(z80->pvt->proc_ctx, z80, t);
 		break;
 	}	/* end of "extinstr" "switch" */
 
@@ -1914,20 +1975,22 @@ iregbitinstr:
 
 
 	default: 
-		vm_undefinstr(z80->vm, z80, t);
+		z80->pvt->proc_undefinstr(z80->pvt->proc_ctx, z80, t);
 		break;
 	}	/* end of "iregbitinstr" "switch" */
 
 	PC++;	/* bump the PC here instead */
 	goto infloop;
 
+    /* Never reached */
+    return 0;
 }		/* end of "z80_emulator()" */
 
 
 
 /* initialize the z80 struct with sane stuff */
 static z80info *
-init_z80info(z80info *z80, vm *vm)
+init_z80info(z80info *z80)
 {
 	int i;
 
@@ -1974,7 +2037,7 @@ init_z80info(z80info *z80, vm *vm)
 	REGIR[0] = &I;
 	REGIR[1] = &R;
 
-	z80->vm = vm;
+	z80->pvt = calloc(1, sizeof(z80state));
 
 	/* initialize the global parity array if necessary */
 	if (!parity_inited)
@@ -1998,7 +2061,7 @@ init_z80info(z80info *z80, vm *vm)
 }
 
 z80info *
-z80_new(vm * vm)
+z80_new()
 {
 	z80info *z80 = malloc(sizeof *z80);
 
@@ -2008,19 +2071,20 @@ z80_new(vm * vm)
 		return NULL;
 	}
 
-	return init_z80info(z80, vm);
+	return init_z80info(z80);
 }
 
 void
 z80_set_interceptor(z80info *z80, void *intercept_ctx,
         void (*intercept)(void *, struct z80info *))
 {
-    z80->intercept_ctx = intercept_ctx;
-    z80->intercept = intercept;
+    z80->pvt->intercept_ctx = intercept_ctx;
+    z80->pvt->intercept = intercept;
 }
 
 void
 z80_destroy(z80info *z80)
 {
+	free(z80->pvt);
 	free(z80);
 }
