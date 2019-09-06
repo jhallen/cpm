@@ -241,8 +241,6 @@ z80_run(z80info *z80, int count)
 	word tt, tt2, hh, vv, *rr;
 	longword ttt;
 	int i, j, h, n, s;
-	z80info *obj;
-	obj = z80;
 
 	/* main loop  --  all "goto"s eventually end up here */
 infloop:
