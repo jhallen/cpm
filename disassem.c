@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "defs.h"
-
+#include "disassem.h"
 
 #define bits(l,r) (((z80->mem[loc]) >> (r)) & mask[(l) - (r)])
 #define put_cc(cc) put_str(cc_names[cc])
