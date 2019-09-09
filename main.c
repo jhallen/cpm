@@ -209,6 +209,7 @@ static void
 command(vm *obj, z80info *z80)
 {
 	unsigned int i, j, t, e;
+	int c;
 	char str[256], *s;
 	FILE *fp;
 	static word pe = 0;
@@ -315,11 +316,13 @@ loop:	/* "infinite" loop */
 
 		for (i = 0; i <= 8; i++)
 		{
-			printf("  %.4X:   ", pe);
-
+			printf("  %.4X: ", pe);
 			for (j = 0; j <= 0xF; j++)
-				printf("%.2X  ", z80->mem[pe++]);
-
+				printf("%.2X ", z80->mem[pe++]);
+			for (j = 0; j <= 0xF; j++) {
+				c = z80->mem[t + (i << 4) + j];
+				putchar(isprint(c) ? c : '.');
+			}
 			printf("\n");
 		}
 
