@@ -73,6 +73,7 @@ int kget(int w)
         	for (x = 0; x != stuff_ptr - 1; ++x) {
         		stuff[x] = stuff[x + 1];
         	}
+		stuff_ptr--;
         	stuff[x] = 0;
         	return c;
         }
