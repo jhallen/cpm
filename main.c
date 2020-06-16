@@ -32,6 +32,7 @@
 #else	/* UNIX */
 #	include <unistd.h>
 #	include <sys/ioctl.h>
+#       define __USE_MISC
 #	if defined POSIX_TTY
 #		include <sys/termios.h>
 #	elif defined BeBox
@@ -129,12 +130,7 @@ initterm(void)
 	}
         else {
 	rawterm = oldterm;
-	rawterm.c_iflag &= ~(ICRNL | IXON | IXOFF | INLCR | ICRNL);
-	rawterm.c_lflag &= ~(ICANON | ECHO);
-	rawterm.c_cc[VSUSP] = -1;
-	rawterm.c_cc[VQUIT] = -1;
-	rawterm.c_cc[VERASE] = -1;
-	rawterm.c_cc[VKILL] = -1;
+	cfmakeraw(&rawterm);
   }
 	/* tcsetattr(fileno(stdin), TCSADRAIN, &rawterm); */
 
