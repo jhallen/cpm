@@ -62,7 +62,13 @@ char *rdcmdline(z80info *z80, int max, int ctrl_c_enable)
 
 loop:
     c = kget(0);
-    if (c < ' ' || c == 0x7f) {
+    if (c == INTR_CHAR) {
+    	command(z80);
+    	i = 1;
+    	s[0] = i - 1;
+    	s[i] = 0;
+    	return s;
+    } else if (c < ' ' || c == 0x7f) {
         switch (c) {
 	case 3:
 	    if (ctrl_c_enable) {

@@ -148,6 +148,8 @@ int kget(int w)
                 } else if (c == 'F') { /* End */
                         kpush('d');
                         return 'Q' - '@';
+		} else if (c == 'P' || c == 'Q' || c == 'R' || c == 'S') {
+			return INTR_CHAR;
                 } else {
                 	kpush('O');
                 	kpush(c);

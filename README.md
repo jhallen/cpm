@@ -60,6 +60,27 @@ Here is CP/M WordStar running on Ubuntu in an xterm:
 
 ![CP/M WordStar](cpmws.png)
 
+### Command mode
+
+You may hit Ctrl-_ (Ctrl-underscore- usually you have hold Shift and Ctrl at
+the same time to do this), or any of the F1 - F4 keys to interrupt the
+emulation and bring up the Z-80 command prompt.  From this prompt a number
+of commands are available:
+
+    Cmd: ?
+       Q(uit)  T(race on/off)  S(tep trace)  D(ump regs)
+       E(xamine memory)  P(oke memory)  R(egister modify)
+       L(oad binary)  C(ontinue running - <CR> if Step)
+       G(o) B(oot CP/M)  Z(80 disassembled dump)
+       W(write memory to file)  X,Y(-set/clear breakpoint)
+       O(output to "logfile")
+
+       !(fork shell)  ?(command list)  V(ersion)
+
+
+"Q"uit is the most useful: you can forcibly quit the emulator.  If you want to
+continue the emulation use the "C"ontinue command.
+
 			-- Joe Allen
 
 ## cpmtool

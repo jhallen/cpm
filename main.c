@@ -41,7 +41,6 @@
 #	endif
 #endif
 
-#define INTR_CHAR	31	/* control-underscore */
 
 extern int errno;
 
@@ -131,12 +130,13 @@ initterm(void)
 	rawterm = oldterm;
 	rawterm.c_iflag &= ~(ICRNL | IXON | IXOFF | INLCR | ICRNL);
 	rawterm.c_lflag &= ~(ICANON | ECHO);
+	rawterm.c_cc[VINTR] = -1;
 	rawterm.c_cc[VSUSP] = -1;
 	rawterm.c_cc[VQUIT] = -1;
 	rawterm.c_cc[VERASE] = -1;
 	rawterm.c_cc[VKILL] = -1;
+	tcsetattr(fileno(stdin), TCSADRAIN, &rawterm);
   }
-	/* tcsetattr(fileno(stdin), TCSADRAIN, &rawterm); */
 
 #if 0
 	/* rawterm.c_lflag &= ~(ISIG | ICANON | ECHO); */
@@ -166,7 +166,7 @@ initterm(void)
  |  for some reason or another
 \*-----------------------------------------------------------------------*/
 
-static void
+void
 command(z80info *z80)
 {
 	unsigned int i, j, t, e;
@@ -1034,7 +1034,6 @@ interrupt(int s)
 
 	signal(s, interrupt);
 }
-
 
 /*-----------------------------------------------------------------------*\
  |  main  --  set up the global vars & run the z80

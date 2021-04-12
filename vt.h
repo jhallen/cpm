@@ -11,3 +11,4 @@ int kget(int w);
 /* Write character to terminal */
 void vt52(int c);
 
+#define INTR_CHAR	31	/* control-underscore */
