@@ -478,6 +478,18 @@ void check_BDOS_hook(z80info *z80) {
 	HL = 0;
         B = H; A = L;
 	break;
+    case 3:     /* AUX (Reader) input */
+    	/* FIXME */
+    	/* Returns A=L=ASCII character */
+    	goto UNSUP;
+    case 4:     /* Punch output */
+        /* FIXME */
+        /* Character to punch is in E */
+        goto UNSUP;
+    case 5:     /* Printer output */
+        /* FIXME */
+        /* Character to print is in E */
+        goto UNSUP;
     case 6:     /* direct I/O */
 	switch (E) {
 	case 0xff:  if (!constat()) {
@@ -499,6 +511,12 @@ void check_BDOS_hook(z80info *z80) {
             B = H; A = L;
 	}
 	break;
+    case 7:     /* Get IOBYTE */
+    	/* FIXME */
+        goto UNSUP;
+    case 8:     /* Set IOBYTE */
+        /* FIXME */
+        goto UNSUP;
     case 9:	/* Print String */
 	s = (char *)(z80->mem + DE);
 	while (*s != '$')
@@ -519,35 +537,16 @@ void check_BDOS_hook(z80info *z80) {
         HL = 0;
         B = H; A = L;
 	break;
-    case 12:    /* Return Version Number */
-	HL = 0x22; /* Emulate CP/M 2.2 */
-        B = H; A = L;
-	F = 0;
-	break;
-    case 26:    /* Set DMA Address */
-	z80->dma = DE;
-	HL = 0;
-        B = H; A = L;
-	break;
-    case 32:    /* Get/Set User Code */
-	if (E == 0xff) {  /* Get Code */
-	    HL = usercode;
-            B = H; A = L;
-	} else {
-	    usercode = E;
-            HL = 0; /* Or does it get usercode? */
-            B = H; A = L;
-        }
-	break;
-
-	/* dunno if these are correct */
-
     case 11:	/* Console Status */
 	HL = (constat() ? 0xff : 0x00);
         B = H; A = L;
 	F = 0;
 	break;
-
+    case 12:    /* Return Version Number */
+	HL = 0x22; /* Emulate CP/M 2.2 */
+        B = H; A = L;
+	F = 0;
+	break;
     case 13:	/* reset disk system */
 	/* storedfps = 0; */	/* WS crashes then */
 	HL = 0;
@@ -789,15 +788,39 @@ void check_BDOS_hook(z80info *z80) {
         B = H; A = L;
 	F = 0;
 	break;
+    case 26:    /* Set DMA Address */
+	z80->dma = DE;
+	HL = 0;
+        B = H; A = L;
+	break;
+    case 27:    /* Get Allocation ADR */
+        /* FIXME */
+        goto UNSUP;
+    case 28:    /* Write protect disk */
+        /* FIXME */
+        goto UNSUP;
     case 29:	/* return r/o vector */
 	HL = 0;	/* none r/o */
         B = H; A = L;
 	F = 0;
 	break;
+    case 30:    /* Set file attributes */
+        /* FIXME */
+        goto UNSUP;
     case 31:    /* get disk parameters */
         HL = DPB0;    /* only A: */
         B = H; A = L;
         break;
+    case 32:    /* Get/Set User Code */
+	if (E == 0xff) {  /* Get Code */
+	    HL = usercode;
+            B = H; A = L;
+	} else {
+	    usercode = E;
+            HL = 0; /* Or does it get usercode? */
+            B = H; A = L;
+        }
+	break;
     case 33:	/* read random record */
         {
         long ofst;
@@ -813,6 +836,7 @@ void check_BDOS_hook(z80info *z80) {
     case 34:	/* write random record */
         {
         long ofst;
+        RANDWRITE:
 	fp = getfp(z80, DE);
 	/* printf("data is %02x %02x %02x\n", z80->mem[z80->regde+33],
 	       z80->mem[z80->regde+34], z80->mem[z80->regde+35]); */
@@ -842,22 +866,30 @@ void check_BDOS_hook(z80info *z80) {
 	    fixrc(z80, fp);
 	}
 	break;
-    case 41:
+    case 37:    /* Selectively reset disk drives (allow writing after calling BDOS 28) */
+        A=0; /* Return with no errors */
+        break;
+    case 40:    /* Write rand with 0 fill */
+        /* FIXME */
+        goto RANDWRITE;
+    case 41:    /* Change directory- this is non-standard */
 	for (s = (char *)(z80->mem + DE); *s; ++s)
 	    *s = tolower(*(unsigned char *)s);
 	HL = (restricted_mode || chdir((char  *)(z80->mem + DE))) ? 0xff : 0x00;
         B = H; A = L;
 	break;
     default:
-	printf("\n\nUnrecognized BDOS-Function:\n");
+    	UNSUP:
+	printf("\n\nUnrecognized BDOS-Function %d:\n", C);
 	printf("AF=%04x  BC=%04x  DE=%04x  HL=%04x  SP=%04x\nStack =",
 	       AF, BC, DE, HL, SP);
 	for (i = 0; i < 8; ++i)
 	    printf(" %4x", z80->mem[SP + 2*i]
 		   + 256 * z80->mem[SP + 2*i + 1]);
 	printf("\r\n");
-	resetterm();
-	exit(1);
+	/*resetterm(); */
+	/*exit(1); */
+	break;
     }
     z80->mem[PC = DIRBUF-1] = 0xc9; /* Return instruction */
     return;

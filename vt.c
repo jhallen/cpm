@@ -170,7 +170,7 @@ int kget(int w)
 Oc  Ctrl-Rtarw
 */
 
-void putch(int c) {	/* output character without postprocessing */
+void putch(char c) {	/* output character without postprocessing */
     write(fileno(stdout), &c, 1);
 }
 
